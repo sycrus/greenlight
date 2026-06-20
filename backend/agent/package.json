@@ -1,0 +1,43 @@
+{
+  "name": "@gen-ux/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file ../../.env src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "bash -c 'set -o pipefail; mkdir -p ../../logs && vitest run --reporter=verbose 2>&1 | tee ../../logs/test-$(date +%Y%m%d-%H%M%S).log'",
+    "test:watch": "vitest",
+    "test:coverage": "bash -c 'set -o pipefail; mkdir -p ../../logs && vitest run --coverage --reporter=verbose 2>&1 | tee ../../logs/test-coverage-$(date +%Y%m%d-%H%M%S).log'",
+    "lint": "tsc --noEmit",
+    "studio": "npx @langchain/langgraph-cli@latest dev --port 2024"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.57.0",
+    "@google-cloud/aiplatform": "^6.6.0",
+    "@langchain/core": "^1.1.0",
+    "@langchain/langgraph": "^1.2.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.215.0",
+    "@opentelemetry/sdk-node": "^0.53.0",
+    "@opentelemetry/sdk-trace-base": "^1.30.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.0",
+    "google-auth-library": "^10.6.2",
+    "langfuse": "^3.38.20",
+    "mem0ai": "^2.4.0",
+    "pg": "^8.20.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.20.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}

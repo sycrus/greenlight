@@ -1,0 +1,206 @@
+services:
+  # ── Postgres (local dev only — Cloud SQL is used in production) ───────────────
+  postgres:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_DB: agent_memory
+      POSTGRES_USER: agent
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-localdev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent -d agent_memory"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Mem0 OSS server ───────────────────────────────────────────────────────────
+  mem0:
+    build: ./backend/mem0
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: agent_memory
+      DB_USER: agent
+      DB_PASSWORD: ${DB_PASSWORD:-localdev}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DISTILLATION_MODEL: ${DISTILLATION_MODEL:-claude-haiku-4-5-20251001}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Parlant ──────────────────────────────────────────────────────────────────
+  # Behavioural control layer — brand tone, compliance guardrails.
+  # Calls the agent server as a tool over HTTP.
+  parlant:
+    build:
+      context: ./backend/parlant
+      dockerfile: Dockerfile
+    ports:
+      - "8800:8800"
+    environment:
+      - PARLANT_PORT=8800
+      - AGENT_URL=http://agent:8000
+      - MEM0_BASE_URL=http://mem0:8080
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OTEL_SERVICE_NAME=gen-ux-parlant
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://langfuse:3000/api/public/otel/v1/traces
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+      - OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic ${LANGFUSE_OTLP_AUTH:-bGYtcGstbG9jYWxkZXY6bGYtc2stbG9jYWxkZXY=}
+    volumes:
+      - ./backend/parlant/config:/app/config:ro
+      - type: tmpfs
+        target: /app/parlant-data
+    depends_on:
+      - agent
+      - mem0
+      - langfuse
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8800/agents')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── LlamaIndex RAG service ────────────────────────────────────────────────────
+  # Python FastAPI service. Handles semantic retrieval and document ingestion.
+  # Shares the same pgvector postgres instance as Mem0 (separate table).
+  llama-rag:
+    build:
+      context: ./backend/llama-rag
+    ports:
+      - "8001:8001"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=agent_memory
+      - DB_USER=agent
+      - DB_PASSWORD=${DB_PASSWORD:-localdev}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - RAG_GCS_BUCKET=${RAG_GCS_BUCKET:-}
+      - RAG_GCS_PREFIX=${RAG_GCS_PREFIX:-scraped/}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── LangGraph agent server ───────────────────────────────────────────────────
+  # TypeScript Express server. Hosts the LangGraph graph, orchestrator,
+  # weather agent, rag agent, and customer-service agent.
+  # Built and run via Node — mount source for hot reload in dev.
+  agent:
+    build:
+      context: .
+      dockerfile: backend/agent/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-claude-haiku-4-5-20251001}
+      - WEATHER_API_KEY=${WEATHER_API_KEY}
+      - MEM0_BASE_URL=http://mem0:8080
+      - LLAMA_RAG_URL=http://llama-rag:8001
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-gen-ux-agent}
+      - LANGFUSE_BASEURL=http://langfuse:3000
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-lf-pk-localdev}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-lf-sk-localdev}
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-false}
+      - LANGSMITH_TRACING=${LANGSMITH_TRACING:-false}
+      - LANGSMITH_ENDPOINT=${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY:-}
+      - LANGSMITH_PROJECT=${LANGSMITH_PROJECT:-aip-gen-ux}
+    depends_on:
+      llama-rag:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Frontend ─────────────────────────────────────────────────────────────────
+  # Next.js app. In development, run locally with `pnpm dev` instead.
+  # This service is here for production / CI parity.
+  # frontend:
+  #   build:
+  #     context: ./frontend/app
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_AGENT_URL=http://localhost:8000
+  #     - NEXT_PUBLIC_PARLANT_URL=http://localhost:8800
+  #   depends_on:
+  #     - agent
+  #     - parlant
+
+  # ── Langfuse (LLM observability dashboard) ───────────────────────────────────
+  # Traces from the agent are forwarded here via OTEL.
+  # UI: http://localhost:3002  login: admin@gen-ux.local / localdev
+  langfuse-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: langfuse
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse}
+    volumes:
+      - langfuse_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  langfuse:
+    image: langfuse/langfuse:2
+    ports:
+      - "3002:3000"
+    environment:
+      DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:-langfuse}@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-localdev-secret}
+      NEXTAUTH_URL: http://localhost:3002
+      SALT: ${LANGFUSE_SALT:-localdev-salt}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      LANGFUSE_INIT_ORG_ID: gen-ux
+      LANGFUSE_INIT_ORG_NAME: Gen UX
+      LANGFUSE_INIT_PROJECT_ID: gen-ux-project
+      LANGFUSE_INIT_PROJECT_NAME: Gen UX Agent
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-lf-pk-localdev}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-lf-sk-localdev}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_USER_EMAIL:-admin@gen-ux.local}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_USER_PASSWORD:-localdev}
+      LANGFUSE_INIT_USER_NAME: Admin
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/public/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  langfuse_data:
+
+networks:
+  default:
+    name: gen-ux-network

@@ -1,0 +1,9 @@
+node_modules/
+
+# Build artifacts (regenerable)
+.next/
+dist/
+
+# Runtime logs
+logs/*.log
+*.log

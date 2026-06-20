@@ -14,7 +14,7 @@ The Pre-Production Intelligence Agent sits between a client brief and Google Flo
 
 Every decision at every gate is attributed, timestamped, and written to a permanent audit record on Google Cloud. The generative AI does the analytical and creative legwork. The humans own every decision that matters.
 
-**Predecessor context:** This system extends a brief-to-deck agentic pipeline previously built on LangGraph with Langfuse/OTEL observability. That system validated the brief parsing and structured output pattern. This build ports the pattern to Vertex AI's managed stack, adds the brand compliance and Visual DNA layers, and introduces the two-gate permission structure. The platform shift is deliberate: Vertex AI's native IAM, Pipeline tracing, and GCP billing integration provide enterprise governance that the open-source stack cannot match at agency scale.
+**Predecessor context:** This system extends a brief-to-deck agentic pipeline previously built on a six-service open-source stack — Parlant (behavioural guardrails), LangGraph (orchestration), the Anthropic Claude SDK (LLM calls), Mem0 OSS (long-term user memory), llama-rag (LlamaIndex retrieval), and Langfuse (observability). That system validated the brief parsing and structured output pattern. This build ports the pattern to Vertex AI's managed stack, adds the brand compliance and Visual DNA layers, and introduces the two-gate permission structure. The platform shift is deliberate: Vertex AI's native IAM, Pipeline tracing, and GCP billing integration provide enterprise governance that the open-source stack cannot match at agency scale. The component-by-component mapping is in §7.
 
 **Target context:** Agency creative production teams and brand in-house studios producing short-form video (30s) for brand clients, where multiple named stakeholders must approve a creative direction before production spend begins.
 
@@ -555,11 +555,32 @@ This is the document a producer shows a client when asked what pre-production co
 
 ---
 
-## 7. Comparison with LangGraph Predecessor
+## 7. Migration from Existing Codebase
 
-This system implements the same agent pattern as a previously built brief-to-deck pipeline (LangGraph + Langfuse/OTEL). The migration to Vertex AI is deliberate and the differences are material:
+The predecessor codebase (see line 17 above) is a six-service open-source stack built for a different product (Endava lead-gen decks). Flame Game v0.1 is a selective port, not a lift-and-shift: the chat-style memory, RAG, and token-streaming layers are intentionally dropped because v0.1 is producer-operator-only with a form-driven UI (no multi-user, no real-time collaboration — see §2 out-of-scope).
 
-| Concern | LangGraph + Langfuse | Vertex AI (this system) |
+### 7.1 Component-by-component migration map
+
+| Current component | Responsibility in predecessor codebase | Vertex AI / GCP replacement | Effort | v0.1 scope? |
+|---|---|---|---|---|
+| **Parlant** (`backend/parlant/`) | Brand tone, compliance (NDA / pricing / competitive), routing — primary orchestrator | Folded into Stage 1 parsed brief + Stage 3 Visual DNA `brand_rules_as_prompts` and `negative_prompt_list`. No separate runtime layer in v0.1 | M | Folded — no separate layer |
+| **LangGraph agent server** (`backend/agent/`) | 4-node stateful graph, `MemorySaver` checkpointer | Vertex AI Pipelines DAG (`brief-parsing-v1` → `territory-generation-v1` → `visual-dna-encoding-v1` → `output-generation-v1`) per §6.2 | M | In scope |
+| **Anthropic adapter** (`backend/agent/src/providers/anthropic.adapter.ts`) | All LLM calls — Haiku default, Sonnet for RAG / orchestrator | Gemini 2.5 Flash via Vertex AI API (per §6.1) | S | In scope |
+| **Mem0 OSS** (`backend/mem0/`) | Cross-session user memory with distillation (Haiku + OpenAI embeddings) | Deferred — Vertex AI Agent Engine session memory is per-run, not cross-run user memory. A real equivalent expands v0.1 scope (single-operator) | – | Deferred → §11 |
+| **llama-rag** (`backend/llama-rag/`) | LlamaIndex RAG over external KB (MUT / Endava case studies) | Deferred — Vertex AI Search is the native answer, but corpus management exceeds the 7-day budget. v0.1 uses structured brand-rules form input (§5 Stage 1) | – | Deferred → §11 |
+| **AG-UI SSE protocol** (`frontend/app/src/lib/ag-ui/`) | Token streaming + `component_spec` rendering via `ComponentRenderer` | Not ported — v0.1 UI is form-driven (brief → gates → outputs), polls Vertex Pipeline state instead of streaming tokens | – | Not ported |
+| **Postgres + pgvector** (`docker-compose.yml`) | Vector store shared by Mem0 + llama-rag | Firestore for audit records only (per §6.3). Vector store defunct once Mem0 + llama-rag are deferred | S | In scope |
+| **Langfuse v2** (`docker-compose.yml`) | LLM trace dashboard (v2 pinned — no OTLP support) | Vertex AI Pipelines dashboard + Cloud Logging (per §6.1) | S | In scope |
+| **Next.js 14 App Router** (`frontend/app/`) | UI shell, `/api/chat` Parlant proxy, `/deck/[id]` deck persistence | Next.js 14 on Vercel (kept) — but `/api/chat` Parlant proxy removed; `/deck/[id]` adapted to Slides deck ID | S | In scope |
+| **`weather_agent` + `customer_service_agent`** (`backend/agent/src/agents/`) | Endava lead-gen routing targets (tool stubs) | Not ported — Endava-specific, no Flame Game equivalent | – | Not ported |
+
+**The pattern.** Five components are in scope and have direct Vertex AI replacements. Four are deliberately dropped (Mem0, llama-rag, AG-UI, two Endava agents) because v0.1 has no chat layer to support. One (Parlant) is folded into the data model rather than run as a service — brand rules live inside the parsed brief and Visual DNA objects, enforced by the Gemini prompt structure, not by a separate guardrail service. This is a deliberate architectural decision, not a porting gap.
+
+### 7.2 Platform rationale: open-source multi-service stack vs Vertex AI
+
+The migration to Vertex AI is deliberate and the differences are material:
+
+| Concern | Predecessor (Parlant + LangGraph + Mem0 + llama-rag + Langfuse) | Vertex AI (this system) |
 |---|---|---|
 | Agent runtime | Self-managed graph execution | Agent Engine managed runtime |
 | Observability | OTEL traces, Langsmith/Langfuse dashboard | Vertex Pipelines, Cloud Logging, GCP console |
@@ -571,7 +592,25 @@ This system implements the same agent pattern as a previously built brief-to-dec
 | Scaling | Infrastructure managed by operator | Agent Engine scales automatically |
 | Brand rules | Not implemented | Visual DNA object, encoded per territory |
 
-The LangGraph system was the right tool for fast agency-scale creative work. Vertex AI is the right tool for governed enterprise creative production. The platform choice follows the use case.
+The open-source stack was the right tool for fast agency-scale creative work. Vertex AI is the right tool for governed enterprise creative production. The platform choice follows the use case.
+
+### 7.3 Target repo layout
+
+Flame Game v0.1 code lives under a new top-level `flame-game/` directory at the repo root. The predecessor codebase (`backend/`, `frontend/`, `docker-compose.yml`, `parlant-data/`) remains in place as a frozen reference artifact — its patterns may be consulted (see [`CLAUDE.md`](./CLAUDE.md)), but the predecessor directories are **not** extended with new Flame Game code. This keeps the pivot physically visible in the tree and lets the predecessor be deleted wholesale in a future cleanup without disturbing Flame Game.
+
+```
+greenlight/
+├── flame-game/         new — Flame Game v0.1 (Vertex AI Pipelines, Gemini 2.5 Flash, Imagen 3, Firestore, GCS, Cloud Functions, Slides/Drive)
+├── backend/            predecessor — frozen, reference only
+├── frontend/           predecessor — frozen, reference only
+├── docker-compose.yml  predecessor — frozen, reference only
+├── parlant-data/       predecessor — frozen, reference only
+├── PRD.md              canonical spec (this document)
+├── CLAUDE.md           operational guidance for working in either product
+└── docs/               archived predecessor PRD + supplementary design notes
+```
+
+Day 1 of the build plan (§9) scaffolds `flame-game/`; until then it does not exist. Internal layout of `flame-game/` (e.g. `pipelines/`, `functions/`, `app/`, `lib/`) is decided as part of the Day 1 scaffold.
 
 ---
 
@@ -647,11 +686,13 @@ The prototype is successful if a 12-minute demo answers yes to all of the follow
 - Multi-user support with named roles: Producer, ECD, Client, CD — each with scoped Firestore and Drive permissions via GCP IAM
 - Google Workspace SSO for approver identity (replace manual name entry at gates)
 - Vertex AI Model Evaluation integration for territory quality scoring across runs
+- Cross-session user memory via Vertex AI Agent Engine session memory or Vertex AI Vector Search (replaces Mem0 from the predecessor codebase — see §7.1)
 
 **Brief intelligence**
 - PDF brand guidelines ingestion via Gemini document understanding — automated brand rule extraction
 - Brief gap detection trained on historical brief patterns
 - Multi-brief comparison: how does this brief differ from last quarter's campaign?
+- Vertex AI Search corpus for case-study and prior-campaign grounding (replaces llama-rag from the predecessor codebase — see §7.1)
 
 **Visual DNA**
 - Version control for Visual DNA across a campaign — maintain consistency across multiple 30s executions
@@ -675,4 +716,4 @@ The prototype is successful if a 12-minute demo answers yes to all of the follow
 ---
 
 *Flame Game — Joe Chung, 2026. Built on Google Cloud Vertex AI.*
-*Predecessor: Brief-to-Deck Intelligence Agent, LangGraph + Langfuse/OTEL, 2025.*
+*Predecessor: Endava Lead-Gen Deck Agent — Parlant, LangGraph, Anthropic Claude, Mem0, llama-rag, Langfuse, AG-UI — 2025.*

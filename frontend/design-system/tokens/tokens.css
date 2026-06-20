@@ -1,0 +1,55 @@
+/**
+ * Design tokens — DTCG 3-layer format (placeholder).
+ *
+ * Layer 1: Primitives   — raw values (colour palette, spacing scale)
+ * Layer 2: Semantics    — intent-driven aliases (primary, surface, error)
+ * Layer 3: Components   — component-scoped tokens (button-bg, card-radius)
+ *
+ * Current state: Shadcn CSS variables are used directly (see globals.css).
+ * This file is the placeholder for the Style Dictionary output that will
+ * replace them in phase 2 when Figma tokens are exported via CI.
+ *
+ * TODO (phase 2):
+ *   1. Set up Style Dictionary
+ *   2. Export DTCG tokens from Figma via Tokens Studio
+ *   3. Run CI transform: Figma → Style Dictionary → this file
+ *   4. Replace Shadcn CSS vars in globals.css with these tokens
+ */
+
+/* ── Layer 1: Primitives ─────────────────────────────────────────────────── */
+:root {
+  /* Colour palette */
+  --color-neutral-0:   #ffffff;
+  --color-neutral-50:  #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-900: #0f172a;
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-4: 1rem;
+  --space-8: 2rem;
+
+  /* Border radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-full: 9999px;
+}
+
+/* ── Layer 2: Semantics ──────────────────────────────────────────────────── */
+:root {
+  --color-surface:     var(--color-neutral-0);
+  --color-surface-alt: var(--color-neutral-50);
+  --color-border:      var(--color-neutral-200);
+  --color-text:        var(--color-neutral-900);
+}
+
+/* ── Layer 3: Components ─────────────────────────────────────────────────── */
+:root {
+  --card-bg:           var(--color-surface);
+  --card-border:       var(--color-border);
+  --card-radius:       var(--radius-lg);
+  --card-padding:      var(--space-4);
+}
