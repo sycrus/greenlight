@@ -1,0 +1,42 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783350191981-e0907b",
+    "writtenAt": "2026-07-06T15:03:18.396Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "gemini-2.5-flash",
+    "confidenceScore": 0.8,
+    "inputTokens": 643,
+    "outputTokens": 272,
+    "costUsd": 0.00003245625
+  },
+  "brand": "Netflix",
+  "campaign_objective": "Promote Stranger Things Season 5",
+  "target_audience": {
+    "primary": "existing Stranger Things fans",
+    "secondary": "new viewers"
+  },
+  "key_message": "Anticipate the dark, mysterious, and nostalgic return of Stranger Things with Season 5.",
+  "mandatory_elements": [
+    "Netflix logo",
+    "Stranger Things logo",
+    "new Vecna character"
+  ],
+  "tone_descriptors": [
+    "dark",
+    "mysterious",
+    "nostalgic 80s"
+  ],
+  "format": {
+    "duration_seconds": 30,
+    "aspect_ratio": "9:16",
+    "platform": "YouTube Shorts"
+  },
+  "brief_gaps": [
+    "Specific call to action (CTA) for viewers",
+    "No brand palette or visual guidelines provided",
+    "Specific plot points or themes to highlight for Season 5",
+    "Specific age range or detailed demographics for target audience"
+  ],
+  "confidence_score": 0.8
+}
