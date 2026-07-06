@@ -72,7 +72,7 @@ The canonical spec is [`PRD.md`](./PRD.md) — read it before writing code.
 
 | Function | Service | Why |
 |---|---|---|
-| Brief parsing agent | Vertex AI Agent Engine (Gemini 2.5 Flash) | Managed runtime, native Vertex tracing |
+| Brief parsing agent | Gemini 2.5 Flash via `@google-cloud/vertexai` SDK | Native ADC auth, structured JSON output |
 | Territory & Visual DNA generation | Gemini 2.5 Flash via Vertex AI API | Structured JSON output, cost attribution |
 | Reference image generation | Imagen 3 via Vertex AI API | GCS-native output, SynthID watermarking |
 | Pipeline orchestration & tracing | Vertex AI Pipelines (Kubeflow) | Component-level audit, cost per stage |
@@ -92,6 +92,7 @@ The canonical spec is [`PRD.md`](./PRD.md) — read it before writing code.
 
 - **Google Cloud project** with billing enabled
 - **Vertex AI API** enabled (Gemini 2.5 Flash, Imagen 3)
+- **Vertex AI Studio TOS** accepted (open [Vertex AI Studio](https://console.cloud.google.com/vertex-ai/studio) in console)
 - **Firestore**, **Cloud Storage**, **Cloud Functions** APIs enabled
 - **Google Slides API** and **Google Drive API** enabled
 - **Node.js 20.19+** and **pnpm**
@@ -100,22 +101,24 @@ The canonical spec is [`PRD.md`](./PRD.md) — read it before writing code.
 
 ```bash
 # 1. Clone and install
-git clone <repo-url> && cd greenlight
+git clone <repo-url> && cd greenlight/greenlight
 pnpm install
 
 # 2. GCP foundation (creates service account, enables APIs, sets IAM roles)
-./scripts/setup-gcp.sh
+GCP_PROJECT=<your-project-id> ../scripts/setup-gcp.sh
 
-# 3. Configure environment
+# 3. Authenticate with Application Default Credentials (ADC)
+gcloud auth login
+gcloud auth application-default login
+gcloud auth application-default set-quota-project <your-project-id>
+
+# 4. Configure environment
 cp .env.example .env
 # Fill in: GCP_PROJECT_ID, GCP_SERVICE_ACCOUNT_EMAIL, VERTEX_LOCATION
-
-# 4. Initialize OpenSpec (spec-driven development)
-npm install -g @fission-ai/openspec@latest
-openspec init
+# No service account key needed — ADC handles auth automatically
 
 # 5. Start development
-cd greenlight/app && pnpm dev    # Next.js on :3000
+pnpm dev    # Next.js on :3000
 ```
 
 ---
@@ -141,8 +144,8 @@ Changes live in `greenlight/openspec/changes/` and are archived to `greenlight/o
 
 ```bash
 # TypeScript (Vitest) — greenlight/
-pnpm --filter greenlight test
-pnpm --filter greenlight test:watch   # TDD loop
+cd greenlight && pnpm test
+cd greenlight && pnpm test:watch   # TDD loop
 
 # Python (pytest) — Cloud Functions
 cd greenlight/functions && pytest tests/ -v
@@ -165,7 +168,6 @@ greenlight/tests/
 ```bash
 pnpm test                    # All tests must pass
 pnpm lint                    # TypeScript check
-openspec update              # Update OpenSpec agent instructions
 ```
 
 ---

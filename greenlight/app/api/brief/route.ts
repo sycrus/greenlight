@@ -117,10 +117,12 @@ export async function POST(req: Request) {
       confidenceScore,
     })
 
-    // Commit traces to git (async — don't block the response)
-    void commitStage(runId, "brief-parsing", valid).catch((err) =>
+    // Commit traces to git (fire-and-forget — don't block the response)
+    try {
+      commitStage(runId, "brief-parsing", valid)
+    } catch (err) {
       console.warn("[tracer] git commit failed (non-fatal):", err)
-    )
+    }
 
     return NextResponse.json({
       parsed_brief: parsedBrief,

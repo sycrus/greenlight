@@ -13,7 +13,14 @@
       "Bash(npx tsc *)",
       "Bash(pnpm *)",
       "Bash(mkdir -p greenlight/*)",
-      "Bash(rm -rf greenlight/traces/runs/test-*)"
+      "Bash(rm -rf greenlight/traces/runs/test-*)",
+      "Bash(gcloud config get-value *)",
+      "Bash(gcloud config list *)",
+      "Bash(gcloud projects describe *)",
+      "Bash(gcloud storage buckets describe *)",
+      "Bash(gcloud storage ls *)",
+      "Bash(gcloud firestore databases describe *)",
+      "Bash(gcloud auth application-default print-access-token)"
     ]
   }
 }
