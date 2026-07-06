@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git add greenlight/traces/*)",
+      "Bash(git commit *)",
+      "Bash(node --version)",
+      "Bash(npx vitest *)",
+      "Bash(npx playwright *)",
+      "Bash(npm *)",
+      "Bash(npx tsc *)",
+      "Bash(pnpm *)",
+      "Bash(mkdir -p greenlight/*)",
+      "Bash(rm -rf greenlight/traces/runs/test-*)"
+    ]
+  }
+}

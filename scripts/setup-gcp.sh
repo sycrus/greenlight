@@ -1,142 +1,154 @@
 #!/usr/bin/env bash
-# setup-gcp.sh — provision GCP resources for the agent memory store
+# setup-gcp.sh — provision GCP resources for Greenlight v0.1
 #
 # Usage:
-#   GCP_PROJECT=my-project ./scripts/setup-gcp.sh
+#   GCP_PROJECT=greenlight-v01 ./scripts/setup-gcp.sh
 #
-# Requires: gcloud CLI installed and authenticated
+# Prerequisites (run once per machine):
 #   gcloud auth login
 #   gcloud auth application-default login
+#   gcloud auth application-default set-quota-project $PROJECT_ID
 #
-# Auth: uses Application Default Credentials (ADC) — no service account key file needed.
-# Safe to re-run — checks existence before creating each resource.
+# Auth: Application Default Credentials (ADC) — no service account key file needed.
+# Idempotent — safe to re-run. Checks existence before creating each resource.
 
 set -euo pipefail
 
-# ── Config — override via env vars ─────────────────────────────────────────────
-PROJECT_ID="${GCP_PROJECT:-aip-generative-exp-n0005168}"
-REGION="${GCP_REGION:-australia-southeast1}"
-INSTANCE_NAME="${CLOUD_SQL_INSTANCE:-gen-ux-memory}"
-DB_NAME="${MEMORY_DB_NAME:-agent_memory}"
-DB_USER="${MEMORY_DB_USER:-agent}"
-SA_NAME="${GCP_SA_NAME:-gen-ux-agent}"
+# ── Config ────────────────────────────────────────────────────────────────────
+PROJECT_ID="${GCP_PROJECT:-greenlight-1}"
+REGION="${GCP_REGION:-asia-southeast1}"
+SA_NAME="${GCP_SA_NAME:-greenlight-agent}"
 SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
-SECRET_NAME="${DB_SECRET_NAME:-gen-ux-db-password}"
+BUCKET_NAME="${GCS_BUCKET:-greenlight-assets}"
 
-echo "==> Project:  $PROJECT_ID"
-echo "==> Region:   $REGION"
-echo "==> Instance: $INSTANCE_NAME"
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo ""
+echo -e "${GREEN}╔══════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║   Greenlight — GCP Provisioning      ║${NC}"
+echo -e "${GREEN}╚══════════════════════════════════════╝${NC}"
+echo ""
+echo "  Project:       $PROJECT_ID"
+echo "  Region:        $REGION"
+echo "  Service acct:  $SA_EMAIL"
+echo "  GCS bucket:    gs://${BUCKET_NAME}"
 echo ""
 
-gcloud config set project "$PROJECT_ID"
+gcloud config set project "$PROJECT_ID" 2>/dev/null || true
 
-# ── 1. Enable APIs ──────────────────────────────────────────────────────────────
-echo "==> Enabling APIs..."
+# ── 1. Enable APIs ────────────────────────────────────────────────────────────
+echo -e "${YELLOW}[1/7] Enabling APIs...${NC}"
 gcloud services enable \
   aiplatform.googleapis.com \
-  sqladmin.googleapis.com \
-  secretmanager.googleapis.com \
+  firestore.googleapis.com \
+  storage.googleapis.com \
+  slides.googleapis.com \
+  drive.googleapis.com \
   --project="$PROJECT_ID"
+echo -e "${YELLOW}  (cloudfunctions, cloudbuild — deferred to Day 5)${NC}"
+echo -e "${GREEN}  ✓ APIs enabled${NC}"
+echo ""
 
-# ── 2. Cloud SQL instance ───────────────────────────────────────────────────────
-echo "==> Creating Cloud SQL instance (this takes ~5 min on first run)..."
-if ! gcloud sql instances describe "$INSTANCE_NAME" --project="$PROJECT_ID" &>/dev/null; then
-  gcloud sql instances create "$INSTANCE_NAME" \
-    --database-version=POSTGRES_18 \
-    --edition=ENTERPRISE \
-    --cpu=2 \
-    --memory=8192MB \
-    --region="$REGION" \
-    --storage-size=10GB \
-    --storage-auto-increase \
-    --backup-start-time=03:00 \
-    --project="$PROJECT_ID"
-else
-  echo "    Instance already exists, skipping."
-fi
-
-# ── 3. Database ─────────────────────────────────────────────────────────────────
-echo "==> Creating database '$DB_NAME'..."
-if ! gcloud sql databases describe "$DB_NAME" --instance="$INSTANCE_NAME" --project="$PROJECT_ID" &>/dev/null; then
-  gcloud sql databases create "$DB_NAME" \
-    --instance="$INSTANCE_NAME" \
-    --project="$PROJECT_ID"
-else
-  echo "    Database already exists, skipping."
-fi
-
-# ── 4. DB user ──────────────────────────────────────────────────────────────────
-echo "==> Creating DB user '$DB_USER'..."
-DB_PASSWORD="$(openssl rand -base64 32)"
-if ! gcloud sql users list --instance="$INSTANCE_NAME" --project="$PROJECT_ID" \
-    --format="value(name)" | grep -q "^${DB_USER}$"; then
-  gcloud sql users create "$DB_USER" \
-    --instance="$INSTANCE_NAME" \
-    --password="$DB_PASSWORD" \
-    --project="$PROJECT_ID"
-else
-  echo "    User already exists, skipping password generation."
-  DB_PASSWORD="<existing — retrieve from Secret Manager>"
-fi
-
-# ── 5. Secret Manager ───────────────────────────────────────────────────────────
-echo "==> Storing DB password in Secret Manager..."
-if ! gcloud secrets describe "$SECRET_NAME" --project="$PROJECT_ID" &>/dev/null; then
-  echo -n "$DB_PASSWORD" | gcloud secrets create "$SECRET_NAME" \
-    --replication-policy=automatic \
-    --data-file=- \
-    --project="$PROJECT_ID"
-else
-  echo "    Secret already exists, skipping."
-fi
-
-# ── 6. Service account ──────────────────────────────────────────────────────────
-echo "==> Creating service account '$SA_NAME'..."
+# ── 2. Service account ────────────────────────────────────────────────────────
+echo -e "${YELLOW}[2/7] Creating service account '${SA_NAME}'...${NC}"
 if ! gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &>/dev/null; then
   gcloud iam service-accounts create "$SA_NAME" \
-    --display-name="Gen UX Agent" \
+    --display-name="Greenlight Agent" \
     --project="$PROJECT_ID"
+  echo -e "${GREEN}  ✓ Service account created${NC}"
 else
-  echo "    Service account already exists, skipping."
+  echo -e "${GREEN}  ✓ Service account already exists${NC}"
 fi
+echo ""
 
-# ── 7. IAM roles ────────────────────────────────────────────────────────────────
-echo "==> Granting IAM roles..."
+# ── 3. IAM roles ──────────────────────────────────────────────────────────────
+echo -e "${YELLOW}[3/7] Granting IAM roles...${NC}"
 for ROLE in \
   roles/aiplatform.user \
-  roles/cloudsql.client \
-  roles/secretmanager.secretAccessor; do
+  roles/datastore.user \
+  roles/storage.admin \
+  roles/cloudfunctions.developer; do
+  echo "    ${ROLE}"
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="$ROLE" \
     --condition=None \
-    --quiet
+    --quiet 2>/dev/null || true
 done
+echo -e "${GREEN}  ✓ IAM roles granted${NC}"
+echo ""
 
-# ── 8. Grant ADC user impersonation of the service account ─────────────────────
-# Allows `gcloud auth application-default login` users to act as the SA locally.
-echo "==> Granting ADC impersonation for authenticated user..."
+# ── 4. Grant user impersonation ───────────────────────────────────────────────
+echo -e "${YELLOW}[4/7] Granting ADC impersonation...${NC}"
 CURRENT_USER="$(gcloud config get-value account)"
 gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
   --member="user:${CURRENT_USER}" \
   --role="roles/iam.serviceAccountTokenCreator" \
   --project="$PROJECT_ID" \
-  --quiet
+  --quiet 2>/dev/null || true
+echo -e "${GREEN}  ✓ User '${CURRENT_USER}' can impersonate ${SA_NAME}${NC}"
+echo ""
 
-# ── Done ────────────────────────────────────────────────────────────────────────
-CONNECTION_NAME="${PROJECT_ID}:${REGION}:${INSTANCE_NAME}"
+# ── 5. Firestore ──────────────────────────────────────────────────────────────
+echo -e "${YELLOW}[5/7] Creating Firestore database (native mode)...${NC}"
+if gcloud firestore databases describe "(default)" --project="$PROJECT_ID" >/dev/null 2>&1; then
+  echo -e "${GREEN}  ✓ Firestore database already exists${NC}"
+else
+  gcloud firestore databases create \
+    --type=firestore-native \
+    --location="$REGION" \
+    --project="$PROJECT_ID" 2>/dev/null || echo -e "${YELLOW}  (database already exists or is being created)${NC}"
+  echo -e "${GREEN}  ✓ Firestore database ready${NC}"
+fi
+echo ""
 
+# ── 6. GCS bucket ─────────────────────────────────────────────────────────────
+echo -e "${YELLOW}[6/7] Creating GCS bucket '${BUCKET_NAME}'...${NC}"
+if gcloud storage buckets describe "gs://${BUCKET_NAME}" --project="$PROJECT_ID" >/dev/null 2>&1; then
+  echo -e "${GREEN}  ✓ GCS bucket already exists${NC}"
+else
+  gcloud storage buckets create "gs://${BUCKET_NAME}" \
+    --location="$REGION" \
+    --uniform-bucket-level-access \
+    --project="$PROJECT_ID" 2>/dev/null || echo -e "${YELLOW}  (bucket already exists or name taken)${NC}"
+  echo -e "${GREEN}  ✓ GCS bucket ready${NC}"
+fi
 echo ""
-echo "==> Done. Add these to your .env:"
+
+# ── 7. Summary ────────────────────────────────────────────────────────────────
+echo -e "${YELLOW}[7/7] Writing .env template...${NC}"
+cat > greenlight/.env.gcp <<EOF
+# Generated by setup-gcp.sh — $(date)
+GCP_PROJECT_ID=${PROJECT_ID}
+GCP_SERVICE_ACCOUNT_EMAIL=${SA_EMAIL}
+VERTEX_LOCATION=${REGION}
+GCS_BUCKET_NAME=${BUCKET_NAME}
+EOF
+echo -e "${GREEN}  ✓ Written to greenlight/.env.gcp${NC}"
 echo ""
-echo "    VERTEX_PROJECT=${PROJECT_ID}"
-echo "    VERTEX_LOCATION=${REGION}"
-echo "    CLOUD_SQL_CONNECTION_NAME=${CONNECTION_NAME}"
-echo "    MEMORY_DB_URL=postgresql://${DB_USER}:<password>@/agent_memory?host=/cloudsql/${CONNECTION_NAME}"
+
+# ── Done ──────────────────────────────────────────────────────────────────────
+echo -e "${GREEN}╔══════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║   Provisioning complete              ║${NC}"
+echo -e "${GREEN}╚══════════════════════════════════════╝${NC}"
 echo ""
-echo "==> Auth (run once per machine, no key file needed):"
-echo "    gcloud auth application-default login"
-echo "    gcloud auth application-default set-quota-project ${PROJECT_ID}"
+echo "  Copy the env values to your .env:"
 echo ""
-echo "==> Next: run init-db.sql against the new instance:"
-echo "    gcloud sql connect ${INSTANCE_NAME} --user=${DB_USER} --database=${DB_NAME} < scripts/init-db.sql"
+echo "    cat greenlight/.env.gcp >> greenlight/.env"
+echo ""
+echo "  Next steps:"
+echo "    1. Slides/Drive API — needs domain-wide delegation (manual):"
+echo "       https://console.cloud.google.com/iam-admin/serviceaccounts"
+echo "       → ${SA_EMAIL}"
+echo "       → Add Key (or use ADC impersonation)"
+echo ""
+echo "    2. Verify:"
+echo "       gcloud firestore databases list"
+echo "       gcloud storage buckets describe gs://${BUCKET_NAME}"
+echo ""
+echo "    3. Start dev:"
+echo "       cd greenlight && npm run dev"
+echo ""

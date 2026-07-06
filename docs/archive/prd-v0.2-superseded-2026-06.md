@@ -1,6 +1,6 @@
 > ⚠️ **SUPERSEDED** — 2026-06-18.
-> Replaced by [`PRD.md`](../../PRD.md) at the repo root (Flame Game — Pre-Production Intelligence Agent v0.1).
-> Reason: platform shift from open-source multi-service stack (Parlant + LangGraph + Anthropic + Mem0 + llama-rag) to Vertex AI for Flame Game v0.1.
+> Replaced by [`PRD.md`](../../PRD.md) at the repo root (Greenlight — Pre-Production Intelligence Agent v0.1).
+> Reason: platform shift from open-source multi-service stack (Parlant + LangGraph + Anthropic + Mem0 + llama-rag) to Vertex AI for Greenlight v0.1.
 
 # Product Requirements Document
 ## Agentic AI Platform with Generative UI

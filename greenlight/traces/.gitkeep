@@ -1,0 +1,3 @@
+# Trace files — git-tracked audit trail.
+# Each pipeline run gets a subdirectory: runs/{run_id}/
+# Run directories are created at runtime by lib/tracer.ts.

@@ -1,70 +1,71 @@
-# CLAUDE.md — Flame Game
+# CLAUDE.md — Greenlight
 
-Guidance for Claude Code working in this monorepo.
+Guidance for Claude Code working in this repo.
 
 ---
 
 ## Project context — read this first
 
-This repo is mid-pivot. Two distinct products coexist:
+This repo is Greenlight v0.1 — a governed pre-production pipeline for short-form branded video. **The authoritative spec is [`PRD.md`](./PRD.md)**. Read it before writing code.
 
-- **Current code (predecessor):** an Endava lead-gen chatbot that generates prospect-specific slide decks. Stack: Parlant + LangGraph (TypeScript) + Anthropic Claude SDK + Mem0 OSS + llama-rag + AG-UI SSE + pgvector + Langfuse + Next.js. The code in `backend/` and `frontend/` is this product. The patterns below describe how to work in it.
-- **Target product (canonical):** **Flame Game — Pre-Production Intelligence Agent v0.1**, a governed pre-production pipeline for short-form branded video that outputs a Google Slides deck + a portable creative package (Flow-ready) with two approval gates. Target stack: Vertex AI (Agent Engine, Pipelines, Gemini 2.5 Flash, Imagen 3, Firestore, GCS, Cloud Functions) + Google Slides/Drive APIs. **The authoritative spec is [`PRD.md`](./PRD.md)** at the repo root.
+**Active development** happens in `greenlight/`. The `backend/` directory is a frozen predecessor — architectural reference only. It is not built, deployed, or extended. `frontend/` has been removed.
 
-The component-by-component migration map from current code → Vertex AI target is in [PRD.md §7](./PRD.md). Five components are in-scope for the port; four are deliberately dropped (Mem0, llama-rag, AG-UI, the Endava-specific agents); one (Parlant) is folded into the parsed-brief and Visual DNA data model rather than run as a service.
+**Stack:** Vertex AI (Agent Engine, Pipelines, Gemini 2.5 Flash, Imagen 3) + Firestore + GCS + Cloud Functions (Gen 2) + Google Slides/Drive APIs + Next.js 14 on Vercel.
 
-**Before starting any non-trivial work, ask:** am I touching the predecessor code (use the patterns below) or building Flame Game v0.1 (consult PRD.md first, expect Vertex AI services, no LangGraph/Parlant/Mem0/llama-rag)?
+**Before any non-trivial work:** consult [PRD.md](./PRD.md) for the stage specification, data model, and gate logic. Use OpenSpec (`/opsx:propose`) for changes — never ad-lib architecture.
 
-The original Endava-platform PRD has been archived at [`docs/archive/prd-v0.2-superseded-2026-06.md`](./docs/archive/prd-v0.2-superseded-2026-06.md) — consult it only for historical context on why the predecessor code looks the way it does.
+The predecessor Endava-platform PRD is at [`docs/archive/prd-v0.2-superseded-2026-06.md`](./docs/archive/prd-v0.2-superseded-2026-06.md) — historical context only.
 
 ---
 
-## Monorepo structure
+## Repo structure
 
 ```
-gen-ux/
-├── frontend/
-│   ├── app/           Next.js App Router (port 3000 / 3001)
-│   └── design-system/ component library + registry.json
-└── backend/
-    ├── agent/         TypeScript Express + LangGraph (port 8000)
-    ├── parlant/       Python behavioural guardrails (port 8800)
-    └── skills/        SKILL.md behavioural specs (not code — prompts for agents)
+./
+├── greenlight/              App — Greenlight v0.1
+│   ├── app/                 Next.js 14 App Router (Vercel)
+│   ├── lib/                 Shared types, GCP client wrappers
+│   ├── pipelines/           Vertex AI Pipelines component definitions
+│   ├── functions/           Cloud Functions (approval gate handlers)
+│   ├── tests/               TDD test suite (mirrors pipeline stages)
+│   └── openspec/            Spec-driven development artifacts
+│       ├── changes/         Active change proposals
+│       └── archive/         Completed changes
+├── backend/                 Frozen — predecessor reference patterns
+│   └── agent/src/
+│       ├── providers/       LLM adapter pattern (swap one file → swap provider)
+│       ├── types/           Typed component spec + agent routing
+│       ├── observability/   OTel + Langfuse tracing patterns
+│       ├── agents/          Structured JSON generation + parsing pattern
+│       └── skills/          SKILL.md behavioural spec pattern
+├── docs/archive/            Superseded predecessor PRD
+├── PRD.md                   Canonical spec — source of truth
+└── README.md                Project overview + quick start
 ```
-
-Package manager: **pnpm workspaces** (`pnpm-workspace.yaml`). Never use npm or yarn.
 
 ---
 
 ## Dev commands
 
 ```bash
-# Start everything
-pnpm dev                        # runs all apps/** in parallel
+# Greenlight (active)
+cd greenlight && pnpm dev              # Next.js on :3000
+cd greenlight && pnpm test             # Vitest — all tests
+cd greenlight && pnpm test:watch       # TDD loop
+cd greenlight && pnpm lint             # tsc --noEmit
+cd greenlight && pnpm openspec update  # Update OpenSpec agent instructions
 
-# Per-package
-pnpm --filter @gen-ux/agent dev
-pnpm --filter @gen-ux/frontend dev
-
-# Tests
-pnpm test                       # all packages
-pnpm --filter @gen-ux/agent test
-
-# TypeScript check
-pnpm --filter @gen-ux/agent lint   # runs tsc --noEmit
-
-# Docker
-docker compose up -d            # all services
-docker compose build agent      # rebuild agent image only
+# Predecessor (reference only — not built or deployed)
+pnpm --filter @gen-ux/agent lint       # TypeScript check still works
 ```
 
-Environment: copy `.env.example` → `.env` at the repo root. The agent dev script loads it via `tsx watch --env-file ../../.env`.
+Environment: copy `greenlight/.env.example` → `greenlight/.env`.
 
 ---
 
 ## TypeScript rules (strict — enforce these)
 
-`tsconfig.base.json` enables `strict`, `exactOptionalPropertyTypes`, and `noUncheckedIndexedAccess`. This means:
+`tsconfig.base.json` enables `strict`, `exactOptionalPropertyTypes`, and `noUncheckedIndexedAccess`:
 
 - **Never assign `undefined` to an optional property directly.** Use a conditional spread:
   ```typescript
@@ -75,168 +76,168 @@ Environment: copy `.env.example` → `.env` at the repo root. The agent dev scri
   ```
 - **Always check array index access** — `arr[0]` is `T | undefined` under `noUncheckedIndexedAccess`.
 - **Unused parameters** that must exist for a signature: prefix with `_` (e.g., `_userId`).
-- **Module imports** inside `backend/agent` use `.js` extensions (ESM, `"type": "module"`). Imports inside `frontend/design-system` do **not** — Next.js `transpilePackages` resolves TypeScript source directly.
 
 ---
 
-## LangGraph 1.x patterns
+## OpenSpec workflow (spec-driven development)
 
-LangGraph `@langchain/langgraph@^1.2.0` requires `value` (not `reducer`) for scalar state fields:
+Every feature or fix starts as an OpenSpec change. **No code without a spec.**
+
+```
+/opsx:explore              Explore the problem space, read code, shape a plan
+/opsx:propose <change>     Create proposal.md + specs/ + design.md + tasks.md
+/opsx:apply                Implement tasks from the plan
+/opsx:archive              Archive completed change, update specs
+```
+
+Changes live in `greenlight/openspec/changes/<name>/` with four artifacts:
+
+| Artifact | Purpose |
+|---|---|
+| `proposal.md` | Why this change, what changes |
+| `specs/` | Requirements and scenarios (one .md per spec) |
+| `design.md` | Technical approach, data flow, error handling |
+| `tasks.md` | Implementation checklist (checked off as done) |
+
+The first change (`day-1-gcp-foundations`) is scaffolded and ready to implement.
+
+---
+
+## Test-driven development (TDD)
+
+**Tests are written before implementation.** No exceptions — this is the law in this repo.
+
+```bash
+cd greenlight
+pnpm test:watch   # red → green → refactor loop
+```
+
+Test structure mirrors pipeline stages:
+
+```
+greenlight/tests/
+├── brief-parsing/           Stage 1 — Gemini brief parsing
+├── territory-generation/    Stage 2 — creative territory generation
+├── visual-dna/              Stage 3 — Visual DNA encoding + Imagen
+├── output-generation/       Stage 4 — Slides deck + Flow package
+├── gates/                   ECD + client approval gate logic
+└── pipeline/                End-to-end pipeline integration
+```
+
+**Test patterns:**
+- Schema validation: does the output match the JSON schema from PRD §5?
+- Error handling: empty input, API timeout, malformed response
+- Firestore writes: correct collection, correct shape, correct timestamps
+- Cost tracking: token counts written, calculated correctly
+
+**Tests are integration-first.** Hit real Firebase emulators and Vertex AI where possible. Mock only external HTTP boundaries.
+
+---
+
+## Vertex AI patterns
+
+### Gemini 2.5 Flash structured output
+
+The pattern for getting structured JSON from Gemini is established in `backend/agent/src/agents/slide-deck.ts`:
+
+1. **System prompt** embeds the JSON schema + strict formatting rules
+2. **Response parsing**: strip markdown fences → find outermost `{...}` → `JSON.parse()` → validate against expected shape
+3. **Fallback**: retry once with stricter prompt on parse failure
+4. **Never use `response_mime_type: "application/json"`** — Gemini 2.5 Flash's structured output mode is less reliable than prompt-forced JSON for complex nested schemas
+
+### Gemini adapter
+
+Create `greenlight/lib/gemini.ts` as the single file that calls the Vertex AI SDK. Everything else calls `callGemini()` or `generateImage()`. This is the same adapter pattern as `backend/agent/src/providers/anthropic.adapter.ts` — swap one file to change LLM provider.
+
+- Default model: `gemini-2.5-flash-001`
+- Cost tracking: extract `usageMetadata` from response, write to Firestore stage record
+- Location: `us-central1` (configurable via `VERTEX_LOCATION` env var)
+
+### Imagen 3
+
+- Model: `imagen-3.0-generate-001`
+- Output: GCS URI (not base64 — too large for Firestore)
+- Every generation writes cost to Firestore (`imagen_generation_count`, `imagen_cost`)
+- SynthID watermarking is automatic — no configuration needed
+
+---
+
+## Firestore patterns
+
+### Schema
+
+Collection path: `/runs/{run_id}/stages/{stage_name}`
+Gate records: `/runs/{run_id}/gates/{gate_name}`
+Run summary: `/runs/{run_id}/summary`
+
+### Write pattern
 
 ```typescript
-// CORRECT for scalars in LangGraph 1.x
-userId: Annotation<string>({ value: (_, update) => update, default: () => "" }),
+import { getFirestore } from "firebase-admin/firestore"
 
-// WRONG — "reducer" only works for array merge reducers
-userId: Annotation<string>({ reducer: (_, u) => u }),
+const db = getFirestore()
+
+await db.doc(`runs/${runId}/stages/brief_parsing`).set({
+  parsed_brief: { /* ... */ },
+  brief_gaps: ["..."],
+  confidence_score: 0.85,
+  token_cost: 0.00042,
+  created_at: FieldValue.serverTimestamp(),
+  operator: "joe",
+})
 ```
 
-Message arrays use `reducer`:
+### Read pattern
+
 ```typescript
-messages: Annotation<BaseMessage[]>({
-  reducer: (existing, update) => [...existing, ...update],
-  default: () => [],
-}),
+const doc = await db.doc(`runs/${runId}/gates/ecd_approval`).get()
+if (!doc.exists) {
+  // Gate not yet passed — pipeline is blocked
+}
+const gate = doc.data() // { approval_status, territory_selected, approved_at, ... }
 ```
 
 ---
 
-## Anthropic adapter
+## Cloud Functions patterns
 
-`backend/agent/src/providers/anthropic.adapter.ts` is the only file that calls the Anthropic SDK. Everything else calls `callClaude()` or `streamClaude()`. Do not import `@anthropic-ai/sdk` elsewhere.
+Approval gates are Gen 2 Cloud Functions, triggered by HTTPS POST from the approval form:
 
-- Default model: `claude-haiku-4-5-20251001` (configurable via `DEFAULT_MODEL` env var)
-- Orchestrator gets a smarter model — pass `model: "claude-sonnet-4-6"` in options
-- `client.messages.stream()` is **synchronous** (returns a stream object, not a promise) — do not `await` it
-
----
-
-## Memory
-
-`backend/agent/src/memory/mem0.adapter.ts` exports `createMemoryStore()` which auto-selects:
-- **Mem0Adapter** — if `MEM0_API_KEY` or `MEM0_BASE_URL` is set
-- **PlaceholderMemoryStore** — in-memory fallback (no persistence; used in tests and local dev)
-
-All agent code uses the `MemoryStore` interface from `./types.js`. Never import `Mem0Adapter` directly outside this file.
-
----
-
-## AG-UI SSE protocol
-
-The agent streams Server-Sent Events in this order:
-
-```
-RUN_STARTED
-TEXT_MESSAGE_START   { role: "assistant" }
-TEXT_MESSAGE_CONTENT { delta: "..." }   (one or more)
-TEXT_MESSAGE_END
-RUN_FINISHED         { agentNode: "..." }
+```typescript
+// greenlight/functions/ecd-approval.ts
+export const ecdApproval = onRequest(async (req, res) => {
+  const { runId, territorySelected, approvalStatus, notes, name, email } = req.body
+  // Validate inputs
+  // Write gate record to Firestore
+  // Update pipeline state
+  // Send notification to producer
+})
 ```
 
-On error: `RUN_ERROR { message: "..." }` replaces the above.
-
-Each event is JSON on a `data:` line: `data: {...}\n\n`.
-
-The frontend client is at `frontend/app/src/lib/ag-ui/client.ts`. It calls the Next.js API proxy at `/api/chat`, which forwards to the agent at `AGENT_URL` (default `http://localhost:8000`).
+- Cold start: expect 1–3s latency on first invocation
+- IAM: service account with `datastore.user` role
+- Deploy: `gcloud functions deploy ecd-approval --gen2 --runtime=nodejs20`
 
 ---
 
-## Component registry
+## Predecessor reference patterns (backend/)
 
-`frontend/design-system/registry.json` is the authoritative list of renderable components. The agent embeds a `component_spec` JSON block in its response text. `ComponentRenderer` at `frontend/app/src/components/registry/ComponentRenderer.tsx` parses it, validates it against the registry, and renders the component (real or skeleton).
+These patterns from the frozen predecessor code informed Greenlight's architecture. They are not deployed but are worth consulting for design decisions:
 
-To add a new component:
-1. Build the component in `frontend/design-system/src/components/`
-2. Export it from `frontend/design-system/src/index.ts`
-3. Register it in `frontend/design-system/registry.json`
-4. Add a case to `frontend/app/src/lib/registry/index.ts`
-
----
-
-## Parlant (primary orchestrator + behavioural guardrails)
-
-`backend/parlant/` is a **Python** service — do not add TypeScript to it. It runs as a separate Docker container on port 8800.
-
-**NLP service:** `NLPServices.openai` — OpenAI GPT-4.1 handles guideline evaluation/response generation; text-embedding-3-small handles guideline embeddings. Both require `OPENAI_API_KEY`. Note: switching to `NLPServices.anthropic` pulls in JinaAI BERT (needs `torch`, ~2GB) — not worth it given GPT-4.1's cost/perf.
-
-**Architecture: Parlant is the primary orchestrator.** LangGraph agents are subagents called as tools.
-
-**How it works:**
-- Every user message goes to Parlant first
-- Parlant evaluates which of the 10 guidelines in `config/guidelines.yaml` apply
-- Brand/tone/compliance rules are enforced directly in Parlant's own response
-- Memory guidelines fire `save_memory` or `recall_memories` tools (call Mem0 directly)
-- Routing guidelines fire the `langgraph_agent` tool (`POST agent:8000/chat`) for tasks needing real data or multi-step workflows
-- Tool parameters: `message` only — `session_id` and `customer_id` come from `p.ToolContext`
-
-**Three tool types registered in `entrypoint.py`:**
-- `langgraph_agent` — delegates actionable requests to the LangGraph agent server
-- `save_memory` — stores a user detail in Mem0 (`POST mem0:8080/v1/memories/`)
-- `recall_memories` — retrieves relevant user memories from Mem0 (`POST mem0:8080/v1/memories/search/`)
-
-**Guideline tags** (in `config/guidelines.yaml`) control which tool(s) get associated:
-- `[routing]` → `langgraph_agent`
-- `[memory, save]` → `save_memory`
-- `[memory, recall]` → `recall_memories`
-- no tool tag → Parlant responds directly
-
-**Sandbox UI:** `http://localhost:8800` — shows guideline matches, tool calls, reasoning trace per turn.
-
-**Frontend integration:** `frontend/app/src/app/api/chat/route.ts` manages Parlant sessions and polls `GET /sessions/{id}/events` for replies. Agent reply events have `source: "ai_agent"`, `kind: "message"`. Processing is complete when a `kind: "status"` event has `data.status: "ready"` and `data.data.stage: "completed"`.
-
-**Rebuilding:** `entrypoint.py` is baked into the Docker image (`COPY`) — requires `docker compose build parlant`. `config/guidelines.yaml` is bind-mounted — only needs `--force-recreate`.
-
----
-
-## Docker
-
-Both services build from the **monorepo root** as context (required for `pnpm-lock.yaml` and workspace resolution):
-
-```yaml
-# docker-compose.yml
-agent:
-  build:
-    context: .
-    dockerfile: backend/agent/Dockerfile
-```
-
-The agent Dockerfile uses a multi-stage build: `deps` → `build` (tsc + pnpm deploy) → `runner`. The `pnpm deploy` step runs inside the `build` stage so workspace root files are present.
-
----
-
-## Testing approach
-
-- Tests are **integration-first** — they hit real dependencies where possible, not mocks
-- Vitest for backend; Playwright for frontend E2E
-- Test files live in `backend/agent/tests/` (not co-located with source)
-- Run `pnpm --filter @gen-ux/agent test` before committing agent changes
-
----
-
-## Pre-port Endava TODOs (deprecated — do not action)
-
-These `TODO (phase 2)` markers were written for the Endava product's Phase 2 roadmap. That roadmap is no longer active (see Project context above). The stubs remain in the codebase but will not be completed — the underlying components are dropped or replaced in the Flame Game port (see [PRD.md §7.1](./PRD.md) for the per-component decision).
-
-| Location | Was going to become | Status under Flame Game |
+| Pattern | File | What it teaches |
 |---|---|---|
-| `backend/agent/src/graph/index.ts` | `MemorySaver` → Postgres checkpointer | Dropped — LangGraph agent server is replaced by Vertex AI Pipelines DAG |
-| `backend/agent/src/memory/mem0.adapter.ts` | PlaceholderMemoryStore → real Mem0/pgvector | Dropped — Mem0 is deferred (PRD §7.1, §11) |
-| `backend/agent/src/agents/*.ts` | RAG retrieval tool calls | Dropped — llama-rag is deferred (PRD §7.1, §11) |
-| `backend/agent/src/observability/otel.ts` | ConsoleSpanExporter → OTLPTraceExporter | Dropped — Langfuse is replaced by Vertex AI Pipelines dashboard + Cloud Logging |
-| `backend/parlant/config/guidelines.yaml` | Static YAML → Contentful sync job | Dropped — Endava-specific; brand rules folded into Flame Game's parsed brief + Visual DNA |
-
-If you encounter these markers, leave them in place unless you are actively removing the containing file as part of the Flame Game port.
+| LLM adapter | `backend/agent/src/providers/anthropic.adapter.ts` | Single file wraps SDK; everything else calls `callClaude()`. Swap one file to change provider |
+| Structured output | `backend/agent/src/agents/slide-deck.ts` | System prompt embeds schema → parse JSON → validate → typed component spec |
+| Typed specs | `backend/agent/src/types/index.ts` | `ComponentSpec`, `GraphState`, `AgentRoute` — types drive the pipeline |
+| Observability | `backend/agent/src/observability/` | OTel spans + Langfuse traces — per-call cost attribution pattern |
+| Behavioural specs | `backend/skills/` | SKILL.md as durable prompt assets — same idea as OpenSpec specs |
 
 ---
 
-## Known infrastructure constraints
+## Known constraints
 
-### Langfuse: stay on v2, do NOT upgrade to v3
-
-`docker-compose.yml` pins `langfuse/langfuse:2`. **Do not bump this to v3.**
-
-Langfuse v3 requires ClickHouse as a second database — it will refuse to start without `CLICKHOUSE_URL` set. The OTel OTLP endpoint (`/api/public/otel/v1/traces`) does not exist in v2, so agent traces currently go to the console instead. Fixing this requires either:
-- Adding a ClickHouse container to docker-compose (heavy — ~500 MB image, significant compose changes), or
-- Replacing the OTel exporter in `otel.ts` with the Langfuse Node.js SDK (direct API calls, no ClickHouse needed)
-
-Until that work is done, use **LangSmith** (`http://smith.langchain.com`) as the primary tracing dashboard.
+- **Imagen 3 requires GCP allowlist** — apply before Day 3. Fallback: placeholder URIs if not approved in time.
+- **Google Slides API rate limits**: 100 requests/100 seconds per user. Batch slide creation in a single `batchUpdate` call where possible.
+- **Cloud Functions cold starts**: 1–3s on first invocation. Acceptable for gate approval forms (not latency-sensitive).
+- **Vertex AI Agent Engine** is a newer product. If it doesn't support the structured JSON output pattern needed for brief parsing, fall back to direct Gemini 2.5 Flash API calls via the Vertex AI SDK.
+- **Firestore costs**: writes are cheap, reads are cheaper. Prefer writes on pipeline events, reads only on status checks and gate polling.

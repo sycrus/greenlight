@@ -1,5 +1,5 @@
 # PRD: Pre-Production Intelligence Agent
-### Flame Game — Functional Prototype v0.1
+### Greenlight — Functional Prototype v0.1
 **Status:** Draft · **Owner:** Joe Chung · **Last updated:** June 2026
 
 ---
@@ -29,7 +29,7 @@ Every decision at every gate is attributed, timestamped, and written to a perman
 - Implement two named permission gates (ECD, client) that block pipeline progression until signed off
 
 ### Secondary
-- Qualify Flame Game for Google for Startups Bootstrap Tier ($2,000 GCP credits)
+- Qualify Greenlight for Google for Startups Bootstrap Tier ($2,000 GCP credits)
 - Support application narrative for Google SEAS Brand Team Creative Technologist role and WPP Production Senior Director role
 - Demonstrate comparative platform reasoning: same agent pattern as LangGraph predecessor, deliberate migration to Vertex AI for governance properties
 - Build toward O-1A evidence: novel application of managed AI observability to creative production governance
@@ -557,7 +557,7 @@ This is the document a producer shows a client when asked what pre-production co
 
 ## 7. Migration from Existing Codebase
 
-The predecessor codebase (see line 17 above) is a six-service open-source stack built for a different product (Endava lead-gen decks). Flame Game v0.1 is a selective port, not a lift-and-shift: the chat-style memory, RAG, and token-streaming layers are intentionally dropped because v0.1 is producer-operator-only with a form-driven UI (no multi-user, no real-time collaboration — see §2 out-of-scope).
+The predecessor codebase (see line 17 above) is a six-service open-source stack built for a different product (Endava lead-gen decks). Greenlight v0.1 is a selective port, not a lift-and-shift: the chat-style memory, RAG, and token-streaming layers are intentionally dropped because v0.1 is producer-operator-only with a form-driven UI (no multi-user, no real-time collaboration — see §2 out-of-scope).
 
 ### 7.1 Component-by-component migration map
 
@@ -572,7 +572,7 @@ The predecessor codebase (see line 17 above) is a six-service open-source stack 
 | **Postgres + pgvector** (`docker-compose.yml`) | Vector store shared by Mem0 + llama-rag | Firestore for audit records only (per §6.3). Vector store defunct once Mem0 + llama-rag are deferred | S | In scope |
 | **Langfuse v2** (`docker-compose.yml`) | LLM trace dashboard (v2 pinned — no OTLP support) | Vertex AI Pipelines dashboard + Cloud Logging (per §6.1) | S | In scope |
 | **Next.js 14 App Router** (`frontend/app/`) | UI shell, `/api/chat` Parlant proxy, `/deck/[id]` deck persistence | Next.js 14 on Vercel (kept) — but `/api/chat` Parlant proxy removed; `/deck/[id]` adapted to Slides deck ID | S | In scope |
-| **`weather_agent` + `customer_service_agent`** (`backend/agent/src/agents/`) | Endava lead-gen routing targets (tool stubs) | Not ported — Endava-specific, no Flame Game equivalent | – | Not ported |
+| **`weather_agent` + `customer_service_agent`** (`backend/agent/src/agents/`) | Endava lead-gen routing targets (tool stubs) | Not ported — Endava-specific, no Greenlight equivalent | – | Not ported |
 
 **The pattern.** Five components are in scope and have direct Vertex AI replacements. Four are deliberately dropped (Mem0, llama-rag, AG-UI, two Endava agents) because v0.1 has no chat layer to support. One (Parlant) is folded into the data model rather than run as a service — brand rules live inside the parsed brief and Visual DNA objects, enforced by the Gemini prompt structure, not by a separate guardrail service. This is a deliberate architectural decision, not a porting gap.
 
@@ -596,11 +596,11 @@ The open-source stack was the right tool for fast agency-scale creative work. Ve
 
 ### 7.3 Target repo layout
 
-Flame Game v0.1 code lives under a new top-level `flame-game/` directory at the repo root. The predecessor codebase (`backend/`, `frontend/`, `docker-compose.yml`, `parlant-data/`) remains in place as a frozen reference artifact — its patterns may be consulted (see [`CLAUDE.md`](./CLAUDE.md)), but the predecessor directories are **not** extended with new Flame Game code. This keeps the pivot physically visible in the tree and lets the predecessor be deleted wholesale in a future cleanup without disturbing Flame Game.
+Greenlight v0.1 code lives under a new top-level `greenlight/` directory at the repo root. The predecessor codebase (`backend/`, `frontend/`, `docker-compose.yml`, `parlant-data/`) remains in place as a frozen reference artifact — its patterns may be consulted (see [`CLAUDE.md`](./CLAUDE.md)), but the predecessor directories are **not** extended with new Greenlight code. This keeps the pivot physically visible in the tree and lets the predecessor be deleted wholesale in a future cleanup without disturbing Greenlight.
 
 ```
 greenlight/
-├── flame-game/         new — Flame Game v0.1 (Vertex AI Pipelines, Gemini 2.5 Flash, Imagen 3, Firestore, GCS, Cloud Functions, Slides/Drive)
+├── greenlight/         new — Greenlight v0.1 (Vertex AI Pipelines, Gemini 2.5 Flash, Imagen 3, Firestore, GCS, Cloud Functions, Slides/Drive)
 ├── backend/            predecessor — frozen, reference only
 ├── frontend/           predecessor — frozen, reference only
 ├── docker-compose.yml  predecessor — frozen, reference only
@@ -610,7 +610,7 @@ greenlight/
 └── docs/               archived predecessor PRD + supplementary design notes
 ```
 
-Day 1 of the build plan (§9) scaffolds `flame-game/`; until then it does not exist. Internal layout of `flame-game/` (e.g. `pipelines/`, `functions/`, `app/`, `lib/`) is decided as part of the Day 1 scaffold.
+Day 1 of the build plan (§9) scaffolds `greenlight/`; until then it does not exist. Internal layout of `greenlight/` (e.g. `pipelines/`, `functions/`, `app/`, `lib/`) is decided as part of the Day 1 scaffold.
 
 ---
 
@@ -715,5 +715,5 @@ The prototype is successful if a 12-minute demo answers yes to all of the follow
 
 ---
 
-*Flame Game — Joe Chung, 2026. Built on Google Cloud Vertex AI.*
+*Greenlight — Joe Chung, 2026. Built on Google Cloud Vertex AI.*
 *Predecessor: Endava Lead-Gen Deck Agent — Parlant, LangGraph, Anthropic Claude, Mem0, llama-rag, Langfuse, AG-UI — 2025.*

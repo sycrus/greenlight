@@ -1,328 +1,212 @@
-# Gen UX — Agentic AI Platform
+# Greenlight — Pre-Production Intelligence Agent v0.1
 
-Generative UI platform for **EA Sports Madden Ultimate Team**, powered by LangGraph, Parlant, and Anthropic Claude. User messages flow through Parlant (brand guardrails) to specialist LangGraph agents that handle player card lookups, team-building advice, and knowledge-base retrieval (RAG); responses stream back as AG-UI events that render branded React components in real time. Long-term user memory is handled by a self-hosted Mem0 OSS service backed by pgvector on Cloud SQL.
+Governed pre-production pipeline for short-form branded video. From client brief to approved creative direction with full human decision audit at every gate. Outputs a Google Slides pre-production deck (for human approval) and a Flow-ready creative package (for production handoff).
+
+**Stack:** Vertex AI (Agent Engine, Pipelines, Gemini 2.5 Flash, Imagen 3, Firestore, GCS, Cloud Functions) + Google Slides/Drive APIs + Next.js 14 on Vercel.
+
+---
+
+## What this system does
+
+```
+CLIENT BRIEF (text + brand rules)
+        │
+        ▼
+ Brief Parsing Agent      ← Gemini 2.5 Flash
+        │
+        ▼
+ Creative Territory Gen   ← 3 distinct creative directions
+        │
+        ▼
+ Visual DNA Encoding      ← Gemini 2.5 Flash + Imagen 3
+        │
+   ┌────┴────┐
+   ▼         ▼
+Slides Deck  Flow Package
+   │         (locked)
+   ▼
+Gate 1: ECD Approval      ← Slides review + approval form
+   │
+   ▼
+Gate 2: Client Approval   ← Client-facing deck + approval form
+   │
+   ▼
+Flow Package Released     ← CD begins production in Google Flow
+```
+
+**This system does not generate video.** It governs the decisions that happen _before_ Flow opens — and creates the audit record that explains why the production went in the direction it did.
+
+The canonical spec is [`PRD.md`](./PRD.md) — read it before writing code.
+
+---
+
+## Project structure
+
+```
+./
+├── greenlight/             App — Greenlight v0.1 (Vertex AI)
+│   ├── app/                Next.js 14 App Router (Vercel)
+│   ├── lib/                Shared types, GCP client wrappers
+│   ├── pipelines/          Vertex AI Pipelines component definitions
+│   ├── functions/          Cloud Functions (approval gates)
+│   ├── tests/              TDD test suite
+│   └── openspec/           Spec-driven development artifacts
+├── backend/                Frozen — predecessor reference patterns
+│   └── agent/src/
+│       ├── providers/      LLM adapter pattern
+│       ├── types/          Typed component spec + agent routing
+│       ├── observability/  OTel + Langfuse tracing patterns
+│       ├── agents/         Structured JSON generation + parsing
+│       └── skills/         SKILL.md behavioural spec pattern
+├── docs/archive/           Superseded predecessor PRD
+├── PRD.md                  Canonical spec — source of truth
+├── CLAUDE.md               Operational guidance for Claude Code
+└── README.md               This file
+```
+
+**Predecessor context:** The `backend/` directory is a frozen reference — the original Endava lead-gen deck agent built on Parlant + LangGraph + Anthropic Claude + Mem0 + llama-rag + Langfuse. Its patterns (LLM adapter, structured JSON output, typed component specs, observability) informed Greenlight's architecture. It is not built, deployed, or extended. See [`PRD.md §7`](./PRD.md) for the component-by-component migration map.
+
+---
+
+## Tech stack
+
+| Function | Service | Why |
+|---|---|---|
+| Brief parsing agent | Vertex AI Agent Engine (Gemini 2.5 Flash) | Managed runtime, native Vertex tracing |
+| Territory & Visual DNA generation | Gemini 2.5 Flash via Vertex AI API | Structured JSON output, cost attribution |
+| Reference image generation | Imagen 3 via Vertex AI API | GCS-native output, SynthID watermarking |
+| Pipeline orchestration & tracing | Vertex AI Pipelines (Kubeflow) | Component-level audit, cost per stage |
+| Audit storage | Firestore | Real-time writes, document model, GCP IAM |
+| Asset storage | Google Cloud Storage | Native to Imagen and Flow, signed URLs |
+| Approval gate functions | Cloud Functions (Gen 2) | Serverless, triggered by form submission |
+| Deck generation & sharing | Google Slides API + Drive API | Native to approver workflow |
+| Frontend | Next.js 14 (App Router) on Vercel | API routes for GCP calls, server-side credentials |
+| Spec-driven development | OpenSpec | Changes tracked as proposals → specs → designs → tasks |
+| Testing | Vitest (TS) + pytest (Python CFs) | TDD — tests written before implementation |
 
 ---
 
 ## Quick start
 
+### Prerequisites
+
+- **Google Cloud project** with billing enabled
+- **Vertex AI API** enabled (Gemini 2.5 Flash, Imagen 3)
+- **Firestore**, **Cloud Storage**, **Cloud Functions** APIs enabled
+- **Google Slides API** and **Google Drive API** enabled
+- **Node.js 20.19+** and **pnpm**
+
+### Setup
+
 ```bash
-cp .env.example .env        # fill in ANTHROPIC_API_KEY and OPENAI_API_KEY at minimum
+# 1. Clone and install
+git clone <repo-url> && cd greenlight
 pnpm install
 
-# 1. Build Docker images (required on first run and after changes to agent, parlant, or llama-rag source)
-docker compose build agent parlant llama-rag
+# 2. GCP foundation (creates service account, enables APIs, sets IAM roles)
+./scripts/setup-gcp.sh
 
-# 2. Start backing services
-docker compose up postgres mem0 agent parlant llama-rag langfuse-db langfuse -d
+# 3. Configure environment
+cp .env.example .env
+# Fill in: GCP_PROJECT_ID, GCP_SERVICE_ACCOUNT_EMAIL, VERTEX_LOCATION
 
-# 3. Start the frontend (hot-reload)
-pnpm --filter @gen-ux/frontend dev   # frontend :3000
+# 4. Initialize OpenSpec (spec-driven development)
+npm install -g @fission-ai/openspec@latest
+openspec init
 
-# 4. (Optional) LangGraph Studio — live graph debugger
-pnpm --filter @gen-ux/agent studio   # starts langgraph dev on :2024
-# Open: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
-```
-
-> **Rebuilding after code changes:**
-> - `backend/agent/` changed → `docker compose build agent && docker compose up -d agent`
-> - `backend/parlant/entrypoint.py` changed → `docker compose build parlant && docker compose up -d parlant`
-> - `backend/parlant/config/guidelines.yaml` changed → `docker compose up -d --force-recreate parlant` (bind-mounted, no rebuild needed)
-> - `backend/llama-rag/` changed → `docker compose build llama-rag && docker compose up -d llama-rag`
-
-Without `MEM0_BASE_URL` the agent falls back to an in-memory store with no persistence.
-
-> **RAG — ingest content after first start:**
-> ```bash
-> # Local (llama-rag running in docker compose)
-> python scripts/ingest_local.py \
->   --pages-dir ~/Downloads/mut-scrape/mut-pages \
->   --index     ~/Downloads/mut-scrape/mut-pages-index.json
->
-> # Against Cloud Run (token expires hourly)
-> LLAMA_RAG_URL=https://llama-rag-xxx.run.app \
-> LLAMA_RAG_AUTH_TOKEN=$(gcloud auth print-identity-token) \
-> python scripts/ingest_local.py --pages-dir ... --index ...
-> ```
-> See [docs/rag.md](docs/rag.md) for GCP provisioning and continuous ingestion.
-
----
-
-## Repo structure
-
-```
-gen-ux/
-├── frontend/
-│   ├── app/                Next.js App Router (port 3000)
-│   └── design-system/      Component library + registry.json
-├── backend/
-│   ├── agent/              TypeScript · Express · LangGraph (port 8000)
-│   ├── parlant/            Behavioural control layer (Python · Docker, port 8800)
-│   ├── mem0/               Self-hosted Mem0 OSS memory server (Python · Docker, port 8080)
-│   ├── llama-rag/          RAG retrieval microservice (Python · Docker, port 8001)
-│   └── skills/             SKILL.md behavioural specs (prompts, not code)
-├── scripts/
-│   ├── setup-gcp.sh        Idempotent GCP provisioning (Cloud SQL, SA, Secret Manager)
-│   ├── setup-rag-gcp.sh    RAG GCP provisioning (GCS bucket, Artifact Registry, Cloud Run)
-│   ├── deploy-mem0.sh      Deploy mem0 service to Cloud Run
-│   ├── ingest_local.py     Ingest local scraped content into llama-rag
-│   └── init-db.sql         pgvector schema for Cloud SQL
-└── logs/                   Timestamped test output (gitignored)
+# 5. Start development
+cd greenlight/app && pnpm dev    # Next.js on :3000
 ```
 
 ---
 
-## Architecture
+## Development workflow
+
+### Spec-driven development (OpenSpec)
+
+Every feature or fix starts as an OpenSpec **change**:
 
 ```
-Browser
-  ↓ POST /api/chat
-Next.js API route
-  ↓ REST (session + events)
-Parlant  :8800          ← brand guidelines enforced here
-  ↓ tool call (when routing guideline fires)
-Agent server  :8000     ← LangGraph graph
-  ├── player_agent        → PlayerCard component
-  ├── rag_agent           → CitationsCard component
-  │     ↓ retrieveContext()
-  │   llama-rag  :8001   ← LlamaIndex + pgvector
-  └── team_builder_agent
-  ↓ AG-UI SSE events (proxied back through Parlant → Next.js)
-ChatWindow  →  ComponentRenderer  →  PlayerCard / CitationsCard / text
-
-Memory layer (cross-session):
-Parlant  ↔  Mem0 OSS  :8080  ↔  pgvector (Cloud SQL / local Docker)
-Agent    ↗               ↑ distillation: Claude Haiku + OpenAI embeddings
+/opsx:explore              Explore the codebase and shape a plan
+/opsx:propose <change>     Create proposal.md + specs/ + design.md + tasks.md
+/opsx:apply                Implement tasks from the plan
+/opsx:archive              Archive completed change, update specs
 ```
 
-Parlant handles every message. Simple Q&A and brand/compliance rules are enforced directly by Parlant. Requests needing real data or multi-step workflows are delegated to the LangGraph agent as a tool call. RAG queries always retrieve first — no secondary classification step inside the agent.
+Changes live in `greenlight/openspec/changes/` and are archived to `greenlight/openspec/archive/` on completion.
 
----
+### Test-driven development
 
-## Environment variables
-
-| Variable | Required | Notes |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | Yes | Claude — all LLM calls in the agent server and Mem0 distillation |
-| `OPENAI_API_KEY` | Yes | Parlant guideline embedding + Mem0/llama-rag embeddings (text-embedding-3-small) |
-| `DEFAULT_MODEL` | No | Default: `claude-haiku-4-5-20251001` — rag_agent always uses sonnet |
-| `MEM0_BASE_URL` | No | Self-hosted Mem0 URL — `http://localhost:8080` locally, Cloud Run URL in prod |
-| `MEM0_API_KEY` | No | Mem0 cloud key — only needed if using managed Mem0 instead of self-hosted |
-| `VERTEX_PROJECT` | No | GCP project ID — enables Vertex AI + Cloud SQL memory adapter |
-| `PARLANT_URL` | No | Default: `http://localhost:8800` |
-| `AGENT_URL` | No | Default: `http://localhost:8000` |
-| `LLAMA_RAG_URL` | No | Default: `http://localhost:8001` — set to Cloud Run URL in prod |
-| `RAG_GCS_BUCKET` | No | GCS bucket for raw scraped content (ingest_job.py / Cloud Scheduler) |
-| `RAG_GCS_PREFIX` | No | Default: `scraped/` |
-
-Memory adapter priority: `MEM0_BASE_URL` → `MEM0_API_KEY` → `VERTEX_PROJECT` → in-memory placeholder.
-
----
-
-## Services
-
-| Service | Port | Start |
-|---|---|---|
-| Frontend (Next.js) | 3000 | `pnpm --filter @gen-ux/frontend dev` |
-| Agent (LangGraph) | 8000 | `docker compose up agent` |
-| Parlant | 8800 | `docker compose up parlant` |
-| Mem0 OSS | 8080 | `docker compose up mem0` |
-| llama-rag (RAG) | 8001 | `docker compose up llama-rag` |
-| Postgres + pgvector | 5432 | `docker compose up postgres` |
-| Langfuse (traces UI) | 3002 | `docker compose up langfuse-db langfuse` |
-
-Parlant sandbox UI (conversations, guideline traces, tool calls): `http://localhost:8800`
-
----
-
-## Observability & Tooling
-
-### Langfuse — LLM trace dashboard
-
-> **Note:** Langfuse v2 (pinned in docker-compose) does not support the OTLP endpoint. Agent traces go to console. Use LangSmith as the primary dashboard. See `CLAUDE.md` for details before upgrading Langfuse.
+**Tests are written before implementation.** No exceptions.
 
 ```bash
-docker compose up langfuse-db langfuse -d
-# Open: http://localhost:3002  (login: admin@gen-ux.local / localdev)
+# TypeScript (Vitest) — greenlight/
+pnpm --filter greenlight test
+pnpm --filter greenlight test:watch   # TDD loop
+
+# Python (pytest) — Cloud Functions
+cd greenlight/functions && pytest tests/ -v
 ```
 
-### LangSmith — LangGraph Studio + cloud tracing
-Requires a free account at [smith.langchain.com](https://smith.langchain.com). Add your API key to `.env`:
+Test structure mirrors the pipeline stages:
 
-```bash
-LANGSMITH_API_KEY=lsv2_...
-LANGSMITH_TRACING=true
-LANGSMITH_PROJECT=aip-gen-ux
+```
+greenlight/tests/
+├── brief-parsing/        Stage 1 tests
+├── territory-generation/ Stage 2 tests
+├── visual-dna/           Stage 3 tests
+├── output-generation/    Stage 4 tests
+├── gates/                ECD + client approval tests
+└── pipeline/             End-to-end pipeline tests
 ```
 
-**Studio** (live graph debugger — inspect state at each node, replay runs):
+### Before committing
+
 ```bash
-pnpm --filter @gen-ux/agent studio   # starts langgraph dev on :2024
-# Open: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
+pnpm test                    # All tests must pass
+pnpm lint                    # TypeScript check
+openspec update              # Update OpenSpec agent instructions
 ```
 
 ---
 
-## Memory
+## Key documents
 
-Long-term user memory is handled by `backend/mem0`. See [docs/deploy-memory.md](docs/deploy-memory.md) for full deployment details.
-
-**Local dev:**
-```bash
-docker compose up postgres mem0 -d
-# MEM0_BASE_URL=http://localhost:8080 is set by default in .env
-```
-
-**Production (Cloud Run):**
-```bash
-./scripts/setup-gcp.sh      # provision Cloud SQL + SA + secrets (idempotent)
-./scripts/deploy-mem0.sh    # build + deploy mem0 to Cloud Run, output service URL
-```
-
----
-
-## RAG
-
-Knowledge-base retrieval is handled by `backend/llama-rag` — a LlamaIndex FastAPI microservice. See [docs/rag.md](docs/rag.md) for full details.
-
-**Local dev:**
-```bash
-docker compose up postgres llama-rag -d
-python scripts/ingest_local.py \
-  --pages-dir ~/Downloads/mut-scrape/mut-pages \
-  --index     ~/Downloads/mut-scrape/mut-pages-index.json
-```
-
-**Production (Cloud Run):**
-```bash
-OPENAI_API_KEY=sk-... ./scripts/setup-rag-gcp.sh   # provision + deploy (idempotent)
-# Then ingest with LLAMA_RAG_URL pointing at Cloud Run URL
-```
-
----
-
-## GCP infrastructure
-
-| Resource | Script | Details |
-|---|---|---|
-| Cloud SQL | `setup-gcp.sh` | PostgreSQL 18, Sydney (`australia-southeast1`), shared by Mem0 + RAG |
-| Mem0 Cloud Run | `deploy-mem0.sh` | Self-hosted Mem0 OSS |
-| llama-rag Cloud Run | `setup-rag-gcp.sh` | LlamaIndex RAG service, private (IAM auth) |
-| GCS bucket | `setup-rag-gcp.sh` | Raw scraped content for re-index jobs |
-| Service account | `setup-gcp.sh` | `gen-ux-agent@PROJECT.iam.gserviceaccount.com` |
-| Secret Manager | both scripts | DB password, OPENAI_API_KEY |
-
-Auth uses Application Default Credentials (`gcloud auth application-default login`) — no JSON key file needed.
-
----
-
-## Testing
-
-```bash
-pnpm --filter @gen-ux/agent test        # TypeScript agent tests
-cd backend/llama-rag && pytest tests/ -v  # Python RAG service tests
-```
-
-| File | What it covers |
+| Document | What it covers |
 |---|---|
-| `tests/tools/weather.test.ts` | Schema validation, mock fallback, live API |
-| `tests/tools/retrieve.test.ts` | RAG retrieval tool — success shape, error handling, auth header |
-| `tests/agents/rag.test.ts` | ragAgentNode — retrieval, context injection, CitationsCard, fallback |
-| `tests/agents/orchestrator.test.ts` | Routing unit tests + intent classification |
-| `tests/memory/memory-store.test.ts` | `PlaceholderMemoryStore` unit tests |
-| `tests/memory/user-flows.test.ts` | Mem0 integration (skipped without `MEM0_BASE_URL`) |
-| `backend/llama-rag/tests/test_main.py` | `/health`, `/retrieve`, `/ingest` — 18 tests, fully mocked |
+| [`PRD.md`](./PRD.md) | Canonical spec — problem, architecture, stages, data models, gates, build plan |
+| [`CLAUDE.md`](./CLAUDE.md) | Operational guidance for Claude Code in this repo |
+| [`docs/archive/prd-v0.2-superseded-2026-06.md`](./docs/archive/prd-v0.2-superseded-2026-06.md) | Superseded predecessor PRD (historical reference) |
 
 ---
 
-## Adding a new agent
+## Build plan (7 days)
 
-1. Create `backend/agent/src/agents/my-agent.ts` — export an async node function matching the `GraphState` signature
-2. Register the node in `backend/agent/src/graph/index.ts`
-3. Add a routing guideline in `backend/parlant/config/guidelines.yaml` with appropriate tags
-4. Register the tool in `backend/parlant/entrypoint.py`
-5. Write a Vitest test in `backend/agent/tests/agents/`
-6. Rebuild: `docker compose build agent parlant && docker compose up -d agent parlant`
-
-## Adding a new UI component
-
-1. Create the component in `frontend/design-system/src/components/`
-2. Export it from `frontend/design-system/src/index.ts`
-3. Add an entry to `frontend/design-system/registry.json` with `requiredProps`, `variants`, `useWhen`, `skeletonComponent`
-4. Import and register it in `frontend/app/src/components/registry/ComponentRenderer.tsx`
-
----
-
-## Key files
-
-| File | What it does |
+| Day | Scope |
 |---|---|
-| `backend/parlant/entrypoint.py` | Parlant startup — agent, guidelines, tools: `player_agent`, `rag_agent`, `team_builder_agent`, `save_memory`, `recall_memories` |
-| `backend/parlant/config/guidelines.yaml` | Brand/tone/compliance/routing rules |
-| `backend/llama-rag/main.py` | LlamaIndex RAG service — `/retrieve`, `/ingest`, `/health` |
-| `backend/llama-rag/ingest_job.py` | Cloud Run Job — reads from GCS, calls `/ingest` |
-| `backend/mem0/server.py` | Mem0 OSS FastAPI server |
-| `backend/agent/src/graph/index.ts` | LangGraph graph topology |
-| `backend/agent/src/agents/rag.ts` | RAG agent node — retrieves then generates |
-| `backend/agent/src/tools/retrieve.ts` | Shared retrieval HTTP client (any agent can import) |
-| `backend/agent/src/providers/anthropic.adapter.ts` | Claude provider |
-| `backend/agent/src/memory/mem0.adapter.ts` | `MemoryStore` factory |
-| `frontend/app/src/app/api/chat/route.ts` | Parlant session management + SSE conversion |
-| `frontend/app/src/components/registry/ComponentRenderer.tsx` | Spec → React component |
-| `frontend/design-system/registry.json` | Component registry |
-| `scripts/setup-gcp.sh` | Cloud SQL + SA provisioning |
-| `scripts/setup-rag-gcp.sh` | RAG GCP provisioning (GCS, Artifact Registry, Cloud Run) |
-| `scripts/ingest_local.py` | Local ingest — MUT pages or JSON dir |
+| 1 | GCP foundations — APIs, IAM, Firestore, Next.js scaffold, brief input → Gemini |
+| 2 | Territory generation + Visual DNA encoding prompt engineering |
+| 3 | Imagen 3 reference generation + GCS asset management |
+| 4 | Google Slides API deck generation (ECD + client versions) |
+| 5 | Cloud Functions for approval gates + Firestore gate records |
+| 6 | Flow package JSON assembly + run summary + end-to-end test |
+| 7 | Vertex Pipelines trace integration + demo preparation |
 
 ---
 
-## Phase 1 — what's done
+## Success criteria
 
-### RAG (`backend/llama-rag`)
-- LlamaIndex FastAPI microservice — `/retrieve`, `/ingest`, `/health`
-- `SentenceSplitter(chunk_size=512, chunk_overlap=50)` — chunking before embedding
-- `text-embedding-3-small` (OpenAI, 1536d) in pgvector `rag_documents` table
-- `rag_agent` LangGraph node — unconditional retrieval, sonnet-4-6, `CitationsCard` component
-- `retrieveContext()` shared tool — any agent can import it
-- Auto-fetches GCP identity tokens via `google-auth-library` for Cloud Run auth
-- 18 Python unit tests (fully mocked) + 11+15 TypeScript unit tests
-- GCP: Cloud Run (`llama-rag`), GCS bucket, Artifact Registry — provisioned via `setup-rag-gcp.sh`
-- MUT knowledge base ingested via `ingest_local.py`
-- `CitationsCard` + `CitationsCardSkeleton` design system components
+The prototype is successful if a 12-minute demo answers yes to all:
 
-### Memory (`backend/mem0`)
-- Self-hosted Mem0 OSS on FastAPI — compatible with `mem0ai` npm client REST API
-- Distillation: dedup, contradiction resolution, entity extraction via Claude Haiku
-- Embeddings: OpenAI `text-embedding-3-small` (1536d) stored in pgvector
-- Local: Docker Compose (`postgres` + `mem0` services)
-- Production: Cloud Run + Cloud SQL, provisioned via `scripts/`
-- 12 integration user-flow tests
-
-### Parlant (`backend/parlant`)
-- Python Docker container on port 8800
-- 10 guidelines loaded from `config/guidelines.yaml` (brand, compliance, memory, routing)
-- Five tools: `player_agent`, `rag_agent`, `team_builder_agent`, `save_memory`, `recall_memories`
-- Sandbox UI at `http://localhost:8800`
-
-### Backend (`backend/agent`)
-- Express HTTP/SSE server — `POST /chat`, `GET /health`
-- LangGraph stateful graph: `player_agent`, `rag_agent`, `team_builder_agent` nodes
-- Anthropic SDK adapter — `claude-haiku-4-5-20251001` default, `claude-sonnet-4-6` for RAG
-- OTel instrumentation — all nodes traced
-
-### Frontend + Design system
-- `PlayerCard`, `CitationsCard` — generative UI components with skeletons
-- `ComponentRenderer` — validates specs against `registry.json`, renders skeletons on `TOOL_CALL_START`
+- [ ] Complete pipeline run from brief input to Flow package release
+- [ ] Two permission gates — who approved, what, when
+- [ ] Pipeline cost broken down by component
+- [ ] Google Slides deck generated and explainable
+- [ ] Visual DNA object shown propagating into Flow
+- [ ] Vertex Pipelines dashboard navigable per component
+- [ ] Vertex AI platform rationale explainable vs. LangGraph + Langfuse
+- [ ] Firestore run summary tells the pipeline story without narration
 
 ---
 
-## Phase 2 — next up
-
-| Location | What to do |
-|---|---|
-| `backend/agent/src/graph/index.ts` | Swap `MemorySaver` → Postgres checkpointer |
-| `backend/agent/src/agents/*.ts` | Activate memory read stubs for context hydration |
-| `backend/llama-rag/main.py` | Upsert dedup via `VectorStoreIndex.refresh_ref_docs()` |
-| `backend/parlant/config/guidelines.yaml` | Replace static YAML with Contentful sync job |
-| `frontend/app` | Replace `AGUIClient` with `useCopilotChat` from `@copilotkit/react-core` |
-| Observability | Add ClickHouse to docker-compose → upgrade Langfuse v2 → v3 for OTLP support |
+*Greenlight — Joe Chung, 2026. Built on Google Cloud Vertex AI.*

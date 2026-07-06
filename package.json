@@ -1,23 +1,13 @@
 {
-  "name": "gen-ux",
+  "name": "greenlight-monorepo",
   "private": true,
   "packageManager": "pnpm@9.0.0",
   "scripts": {
-    "dev": "pnpm --parallel --filter './frontend/app' --filter './backend/agent' dev",
-    "build": "pnpm --filter './frontend/design-system' build && pnpm --filter './frontend/app' --filter './backend/agent' build",
-    "test": "pnpm --parallel --filter './frontend/app' --filter './backend/agent' test",
-    "lint": "pnpm --parallel --filter './frontend/app' --filter './backend/agent' lint",
-    "docker:up": "docker compose up -d",
-    "docker:down": "docker compose down"
+    "dev": "pnpm --filter greenlight dev",
+    "test": "pnpm --filter greenlight test",
+    "lint": "pnpm --filter greenlight lint"
   },
   "devDependencies": {
     "typescript": "^5.4.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "@langchain/core": "^1.1.0",
-      "@anthropic-ai/sdk": "^0.57.0",
-      "@opentelemetry/sdk-trace-base": "^1.30.0"
-    }
   }
 }
