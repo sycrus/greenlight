@@ -1,0 +1,45 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783349684518-49d8b2",
+    "writtenAt": "2026-07-06T14:54:51.613Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "gemini-2.5-flash",
+    "confidenceScore": 0.85,
+    "inputTokens": 628,
+    "outputTokens": 295,
+    "costUsd": 0.0000339
+  },
+  "brand": "Nike",
+  "campaign_objective": "Generate awareness and excitement for the new Air Max Dn sneaker among Gen Z.",
+  "target_audience": {
+    "primary": "Gen Z sneakerheads",
+    "secondary": null
+  },
+  "key_message": "Highlight the innovative Dynamic Air unit in the new Air Max Dn.",
+  "mandatory_elements": [
+    "brand logo",
+    "brand tagline",
+    "product shot of Air Max Dn",
+    "Dynamic Air unit (visual demonstration)"
+  ],
+  "tone_descriptors": [
+    "Bold",
+    "Energetic",
+    "Innovative",
+    "Dynamic"
+  ],
+  "format": {
+    "duration_seconds": 30,
+    "aspect_ratio": "9:16",
+    "platform": "TikTok"
+  },
+  "brief_gaps": [
+    "Specific call to action not provided.",
+    "Target audience age range within Gen Z not specified.",
+    "Specific visual style or creative direction preferences not detailed (beyond 'show Dynamic Air unit').",
+    "Any specific sounds, music, or trend integration expectations for TikTok not mentioned.",
+    "Budget or production constraints not provided."
+  ],
+  "confidence_score": 0.85
+}
