@@ -1,0 +1,45 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783581720330-7f2fc8",
+    "writtenAt": "2026-07-09T07:22:07.864Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "gemini-2.5-flash",
+    "confidenceScore": 0.85,
+    "inputTokens": 805,
+    "outputTokens": 221,
+    "costUsd": 0.00003166875
+  },
+  "brand": "Nike",
+  "campaign_objective": "Launch the new Nike Air Max Dn shoe, highlighting its unique Dynamic Air technology to Gen Z.",
+  "target_audience": {
+    "primary": "Gen Z (18–24), sneaker culture, streetwear adjacent",
+    "secondary": null
+  },
+  "key_message": "Feel the Unreal.",
+  "mandatory_elements": [
+    "visible Air unit in every shot",
+    "Nike swoosh visible in first and last 3 seconds",
+    "brand tagline: Feel the Unreal",
+    "no competitor footwear"
+  ],
+  "tone_descriptors": [
+    "raw",
+    "real",
+    "unpolished",
+    "authentic"
+  ],
+  "format": {
+    "duration_seconds": 30,
+    "aspect_ratio": "9:16",
+    "platform": "TikTok"
+  },
+  "brief_gaps": [
+    "Explicit call to action missing",
+    "Specific music direction not provided",
+    "Talent/influencer strategy not specified",
+    "Specific scenarios or activities to showcase the shoe are not detailed",
+    "Budget information not provided"
+  ],
+  "confidence_score": 0.85
+}
