@@ -14,6 +14,7 @@ import { generateImage } from "@greenlight/lib/genkit"
 import { generateImage as generateComfyImage } from "@greenlight/lib/comfyui"
 import { uploadToGcs, gcsToHttps } from "@greenlight/lib/gcs"
 import { readStageRecord, writeStageRecord } from "@greenlight/lib/firestore"
+import { buildIngredientPrompt } from "@greenlight/lib/prompts/ideogram-prompt"
 
 export const runtime = "nodejs"
 
@@ -139,9 +140,33 @@ export async function POST(req: Request) {
           : undefined
 
         // Generate image — Gemini or ComfyUI
+        let imagePrompt: string = prompt
+        if (useComfyUI) {
+          // Build Ideogram-structured prompt for ComfyUI
+          const palette = Array.isArray(vd["palette"])
+            ? []
+            : [...((vd["palette"] as Record<string, string[]>)["primary"] ?? []),
+               ...((vd["palette"] as Record<string, string[]>)["accent"] ?? [])]
+          const cine = (vd["cinematography"] as Record<string, unknown>) ?? {}
+          const ideogramPrompt = buildIngredientPrompt({
+            description: ing.description,
+            flowPrompt: ing.flow_ingredient_prompt,
+            palette,
+            cinematography: {
+              style: (cine["style"] as string) ?? "photorealistic",
+              lighting: (cine["lighting"] as string) ?? "natural",
+              shotTypes: (cine["preferred_shot_types"] as string[]) ?? ["medium shot"],
+            },
+            negativePrompts: Array.isArray(vd["negative_prompt_list"])
+              ? (vd["negative_prompt_list"] as string[])
+              : [],
+          })
+          imagePrompt = JSON.stringify(ideogramPrompt)
+        }
+
         const result = useComfyUI
           ? await generateComfyImage({
-              prompt,
+              prompt: imagePrompt,
               ...(negativePrompt !== undefined && { negativePrompt }),
               ...(workflow !== undefined && { workflow }),
               width: 1024,
