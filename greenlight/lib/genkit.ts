@@ -66,6 +66,8 @@ export interface ImageGenerationResult {
   imageBuffer: Buffer
   costUsd: number
   model: string
+  /** Error message if generation failed and placeholder was used */
+  error?: string
 }
 
 // ── Pricing ──────────────────────────────────────────────────────────────────
@@ -169,13 +171,16 @@ export async function generateImage(
       "photorealistic, high quality",
     ].join(". ")
 
+    // Try Imagen via Genkit — no output.format needed, Imagen returns media natively
     const response = await ai().generate({
       model: IMAGEN_MODEL,
       prompt,
-      output: { format: "media" },
     })
 
+    // Check for media in response
     const media = response.media
+    let errorDetail = ""
+
     if (media?.url) {
       const base64 = media.url.replace(/^data:image\/\w+;base64,/, "")
       if (base64 && base64.length > 100) {
@@ -186,14 +191,19 @@ export async function generateImage(
           model: IMAGEN_MODEL,
         }
       }
+      errorDetail = `base64 too short: ${base64.length} chars`
+    } else if (response.text) {
+      errorDetail = `model returned text instead of image: "${response.text.slice(0, 200)}"`
+    } else {
+      errorDetail = `no media and no text in response. finishReason: ${response.finishReason ?? "unknown"}`
     }
 
-    console.warn("[genkit] No image data in Imagen response — using placeholder")
-    return generatePlaceholder()
+    console.warn(`[genkit] Imagen returned no image: ${errorDetail}`)
+    return { ...generatePlaceholder(), error: errorDetail }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.warn(`[genkit] Image generation failed: ${message.slice(0, 200)} — using placeholder`)
-    return generatePlaceholder()
+    console.warn(`[genkit] Image generation failed: ${message.slice(0, 300)}`)
+    return { ...generatePlaceholder(), error: message }
   }
 }
 

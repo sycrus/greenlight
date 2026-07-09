@@ -64,7 +64,6 @@ describe("generateImage", () => {
       expect.objectContaining({
         model: expect.stringContaining("imagen"),
         prompt: expect.stringContaining("A test image prompt"),
-        output: { format: "media" },
       })
     )
   })

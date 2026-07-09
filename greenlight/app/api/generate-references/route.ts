@@ -153,6 +153,7 @@ export async function POST(req: Request) {
           type: ing.type,
           gcsUri: upload.gcsUri,
           publicUrl: upload.publicUrl,
+          ...(result.error !== undefined && { imageError: result.error }),
         })
 
         totalCost += result.costUsd

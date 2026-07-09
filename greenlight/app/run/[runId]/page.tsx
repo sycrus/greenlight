@@ -334,7 +334,10 @@ function VisualDNAPanel({
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Generation failed")
-      if (data.errors?.length > 0) {
+      // Show image-level errors if the model returned a placeholder
+      if (data.generated?.[0]?.imageError) {
+        setGenError(`Imagen unavailable: ${data.generated[0].imageError}`)
+      } else if (data.errors?.length > 0) {
         throw new Error(data.errors[0].error)
       }
       onRefresh()
