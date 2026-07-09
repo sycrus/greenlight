@@ -83,15 +83,16 @@ export async function POST(req: Request) {
     const territoryName = (vd["territory_id"] as string) ?? territoryId
 
     // Filter: which ingredients need generation?
+    const explicitlyRequested = ingredientIds && ingredientIds.length > 0
     const toGenerate = ingredients.filter((ing) => {
-      // Skip if already has a generated URI
-      if (ing.generated_reference_uri) return false
       // Skip brand_asset — logos should use uploaded assets
       if (ing.type === "brand_asset") return false
-      // If ingredientIds specified, only process those
-      if (ingredientIds && ingredientIds.length > 0) {
+      // If specific ingredients requested, always regenerate those
+      if (explicitlyRequested) {
         return ingredientIds.includes(ing.ingredient_id)
       }
+      // Bulk generation: skip if already has a URI
+      if (ing.generated_reference_uri) return false
       return true
     })
 
