@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-07-09T16:04:45.005Z",
+  "runId": "run-1783611269650-9483fc",
+  "territoryId": "territory-3",
+  "ingredientId": "obj-1",
+  "source": "gemini",
+  "prompt": "A high-quality electronic device, partially disassembled, revealing intricate internal circuits and mechanical components. The device is clean, made of brushed metal and precision-engineered plastics, on a neutral workbench surface.",
+  "result": "success",
+  "filename": "obj-1",
+  "durationMs": 0
+}

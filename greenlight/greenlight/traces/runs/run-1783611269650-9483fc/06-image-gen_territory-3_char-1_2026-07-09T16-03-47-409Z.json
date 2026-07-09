@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-07-09T16:03:47.409Z",
+  "runId": "run-1783611269650-9483fc",
+  "territoryId": "territory-3",
+  "ingredientId": "char-1",
+  "source": "gemini",
+  "prompt": "A focused technician, 30-45 years old, neutral expression, wearing a clean dark grey workshop coat, holding a precision tool, hands in frame, repairing a complex device.",
+  "result": "success",
+  "filename": "char-1",
+  "durationMs": 0
+}

@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-07-09T16:04:29.318Z",
+  "runId": "run-1783611269650-9483fc",
+  "territoryId": "territory-3",
+  "ingredientId": "loc-1",
+  "source": "gemini",
+  "prompt": "A pristine, minimalist workshop environment with polished concrete floors, sleek metal workbenches, cool overhead LED strip lighting, and specialized tools neatly arranged, emphasizing clean lines and functional design.",
+  "result": "success",
+  "filename": "loc-1",
+  "durationMs": 0
+}
