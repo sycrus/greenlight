@@ -189,15 +189,18 @@ function injectPrompt(
   positive: string,
   negative?: string
 ): void {
-  for (const [_nodeId, node] of Object.entries(workflow)) {
+  for (const [nodeId, node] of Object.entries(workflow)) {
     const n = node as Record<string, unknown>
     if (n["class_type"] === "CLIPTextEncode") {
+      const meta = n["_meta"] as Record<string, string> | undefined
+      const title = meta?.["title"] ?? ""
       const inputs = n["inputs"] as Record<string, unknown>
-      const title = inputs["_meta"] as Record<string, string> | undefined
-      if (title?.["title"] === "Positive" || (Object.keys(workflow).length <= 5)) {
+      if (title.includes("Positive")) {
         inputs["text"] = positive
-      } else if (title?.["title"] === "Negative" || negative) {
+        console.log(`[comfyui] Injected positive prompt into node ${nodeId}`)
+      } else if (title.includes("Negative")) {
         inputs["text"] = negative ?? "ugly, blurry, low quality, distorted"
+        console.log(`[comfyui] Injected negative prompt into node ${nodeId}`)
       }
     }
   }
