@@ -214,100 +214,113 @@ export async function POST(req: Request) {
 
     const copy = parsed as DeckCopy
 
-    // 3. Create ECD deck
-    const deckTitle = `${copy.titleSlide.headline} — Pre-Production Deck`
-    const ecdDeck = await createDeck(deckTitle)
+    // 3. Try Slides API, fall back to HTML deck
+    let ecdDeckUrl = ""
+    let clientDeckUrl = ""
+    let slidesDeckIdEcd = ""
+    let slidesDeckIdClient = ""
+    let slideCountEcd = 15
+    let slideCountClient = 14
 
-    // Build slide requests
-    const territorySlides = territories.map((t, i) => {
-      const tid = `t${i + 1}`
-      const vd = visualDnaMap[tid]
-      return {
-        coverHeadline: copy.territories[tid]?.coverHeadline ?? (t["name"] as string),
-        propositionBlurb: copy.territories[tid]?.propositionBlurb ?? "",
-        visualSummary: copy.territories[tid]?.visualSummary ?? "",
-        toneDescriptor: copy.territories[tid]?.toneDescriptor ?? "",
-        sceneArcNotes: copy.territories[tid]?.sceneArcNotes ?? "",
-        sceneCount: copy.territories[tid]?.sceneCount ?? (t["scene_count_suggestion"] as number) ?? 4,
-        flowPromptStyle: copy.territories[tid]?.flowPromptStyle ?? "",
-        riskFlag: copy.territories[tid]?.riskFlag ?? (t["risk_flag"] as string | null) ?? null,
-        palettePrimary: (vd?.["palette"] as Record<string, string[]>)?.["primary"] ?? [],
-        paletteAccent: (vd?.["palette"] as Record<string, string[]>)?.["accent"] ?? [],
-      }
-    })
-
-    const brandNotes = copy.brandAlignment?.territoryNotes ?? {}
-    const brandNotesText = Object.entries(brandNotes)
-      .map(([tid, note]) => `${tid}: ${note}`)
-      .join("\n")
-
-    const requests = buildDeckRequests({
-      brand: (brief["brand"] as string) ?? "Unknown",
-      titleSlide: copy.titleSlide,
-      territories: territorySlides,
-      visualOverview: copy.visualOverview,
-      brandAlignment: {
-        territoryNotes: brandNotesText,
-        divergenceNotes: copy.brandAlignment?.divergenceNotes ?? "",
-        riskSummary: copy.brandAlignment?.riskSummary ?? "",
-      },
-      approvalSlide: copy.approvalSlide,
-      nextSteps: copy.nextSteps,
-    })
-
-    await populateSlides(ecdDeck.presentationId, requests)
-
-    // 4. Share ECD deck
-    const ecdEmail = process.env["ECD_EMAIL"] ?? ""
-    let ecdShareUrl = ecdDeck.url
-    if (ecdEmail) {
-      try {
-        const shareResult = await shareDeck(ecdDeck.presentationId, ecdEmail, "commenter")
-        ecdShareUrl = shareResult.url
-      } catch (err) {
-        console.warn("[generate-deck] ECD share failed:", err instanceof Error ? err.message : err)
-      }
-    }
-
-    // 5. Duplicate for client version
-    const clientTitle = `${copy.titleSlide.headline} — Pre-Production Deck (Client)`
-    const clientDeck = await duplicateDeck(ecdDeck.presentationId, clientTitle)
-
-    // 6. Remove internal-only slides from client deck
     try {
-      const slideIds = await getSlideIds(clientDeck.presentationId)
-      // Brand Alignment is slide 13 (0-indexed: 12)
-      if (slideIds.length >= 13 && slideIds[12]) {
-        await removeSlides(clientDeck.presentationId, [slideIds[12]])
-      }
-    } catch (err) {
-      console.warn("[generate-deck] Client slide removal failed:", err instanceof Error ? err.message : err)
-    }
+      const deckTitle = `${copy.titleSlide.headline} — Pre-Production Deck`
+      const ecdDeck = await createDeck(deckTitle)
 
-    // 7. Share client deck
-    const clientEmail = process.env["CLIENT_EMAIL"] ?? ""
-    let clientShareUrl = clientDeck.url
-    if (clientEmail) {
+      // Build slide requests
+      const territorySlides = territories.map((t, i) => {
+        const tid = `t${i + 1}`
+        const vd = visualDnaMap[tid]
+        return {
+          coverHeadline: copy.territories[tid]?.coverHeadline ?? (t["name"] as string),
+          propositionBlurb: copy.territories[tid]?.propositionBlurb ?? "",
+          visualSummary: copy.territories[tid]?.visualSummary ?? "",
+          toneDescriptor: copy.territories[tid]?.toneDescriptor ?? "",
+          sceneArcNotes: copy.territories[tid]?.sceneArcNotes ?? "",
+          sceneCount: copy.territories[tid]?.sceneCount ?? (t["scene_count_suggestion"] as number) ?? 4,
+          flowPromptStyle: copy.territories[tid]?.flowPromptStyle ?? "",
+          riskFlag: copy.territories[tid]?.riskFlag ?? (t["risk_flag"] as string | null) ?? null,
+          palettePrimary: (vd?.["palette"] as Record<string, string[]>)?.["primary"] ?? [],
+          paletteAccent: (vd?.["palette"] as Record<string, string[]>)?.["accent"] ?? [],
+        }
+      })
+
+      const brandNotes = copy.brandAlignment?.territoryNotes ?? {}
+      const brandNotesText = Object.entries(brandNotes)
+        .map(([tid, note]) => `${tid}: ${note}`)
+        .join("\n")
+
+      const requests = buildDeckRequests({
+        brand: (brief["brand"] as string) ?? "Unknown",
+        titleSlide: copy.titleSlide,
+        territories: territorySlides,
+        visualOverview: copy.visualOverview,
+        brandAlignment: {
+          territoryNotes: brandNotesText,
+          divergenceNotes: copy.brandAlignment?.divergenceNotes ?? "",
+          riskSummary: copy.brandAlignment?.riskSummary ?? "",
+        },
+        approvalSlide: copy.approvalSlide,
+        nextSteps: copy.nextSteps,
+      })
+
+      await populateSlides(ecdDeck.presentationId, requests)
+
+      // Share ECD deck
+      const ecdEmail = process.env["ECD_EMAIL"] ?? ""
+      ecdDeckUrl = ecdDeck.url
+      if (ecdEmail) {
+        try {
+          const shareResult = await shareDeck(ecdDeck.presentationId, ecdEmail, "commenter")
+          ecdDeckUrl = shareResult.url
+        } catch (err) {
+          console.warn("[generate-deck] ECD share failed:", err instanceof Error ? err.message : err)
+        }
+      }
+
+      // Duplicate for client version
+      const clientTitle = `${copy.titleSlide.headline} — Pre-Production Deck (Client)`
+      const clientDeck = await duplicateDeck(ecdDeck.presentationId, clientTitle)
+
+      // Remove internal-only slides
       try {
-        const shareResult = await shareDeck(clientDeck.presentationId, clientEmail, "reader")
-        clientShareUrl = shareResult.url
+        const slideIds = await getSlideIds(clientDeck.presentationId)
+        if (slideIds.length >= 13 && slideIds[12]) {
+          await removeSlides(clientDeck.presentationId, [slideIds[12]])
+        }
       } catch (err) {
-        console.warn("[generate-deck] Client share failed:", err instanceof Error ? err.message : err)
+        console.warn("[generate-deck] Client slide removal failed:", err instanceof Error ? err.message : err)
       }
+
+      // Share client deck
+      const clientEmail = process.env["CLIENT_EMAIL"] ?? ""
+      clientDeckUrl = clientDeck.url
+      if (clientEmail) {
+        try {
+          const shareResult = await shareDeck(clientDeck.presentationId, clientEmail, "reader")
+          clientDeckUrl = shareResult.url
+        } catch (err) {
+          console.warn("[generate-deck] Client share failed:", err instanceof Error ? err.message : err)
+        }
+      }
+
+      slidesDeckIdEcd = ecdDeck.presentationId
+      slidesDeckIdClient = clientDeck.presentationId
+      console.log("[generate-deck] Slides API succeeded")
+    } catch (slidesErr) {
+      console.warn("[generate-deck] Slides API failed, using HTML deck:", slidesErr instanceof Error ? slidesErr.message : slidesErr)
+      // Fall back to HTML deck
+      const baseUrl = process.env["NEXT_PUBLIC_APP_URL"] ?? "http://localhost:3000"
+      ecdDeckUrl = `${baseUrl}/api/deck-html?runId=${runId}&variant=ecd`
+      clientDeckUrl = `${baseUrl}/api/deck-html?runId=${runId}&variant=client`
     }
 
-    // 8. Assemble & upload Flow package
+    // 4. Assemble & upload Flow package
     const flowPackage = assembleFlowPackage(runId, brief, territories, visualDnaMap)
     const flowBuffer = Buffer.from(JSON.stringify(flowPackage, null, 2), "utf-8")
 
     let flowGcsUri = ""
     let flowPublicUrl: string | null = null
     try {
-      const flowUpload = await uploadToGcs(flowBuffer, {
-        runId,
-        ingredientId: "flow-package",
-      })
-      // Re-upload with correct path
       const { Storage } = await import("@google-cloud/storage")
       const keyJson = process.env["GCP_SERVICE_ACCOUNT_KEY"]
       const projectId = process.env["GCP_PROJECT_ID"] ?? ""
@@ -323,28 +336,29 @@ export async function POST(req: Request) {
       console.warn("[generate-deck] Flow package upload failed:", err instanceof Error ? err.message : err)
     }
 
-    // 9. Write output record to Firestore
+    // 5. Write output record to Firestore (include deck copy for HTML rendering)
     await writeStageRecord({
       stage: "output-generation",
       runId,
       data: {
-        slides_deck_id_ecd: ecdDeck.presentationId,
-        slides_deck_id_client: clientDeck.presentationId,
-        ecd_deck_url: ecdShareUrl,
-        client_deck_url: clientShareUrl,
+        _deckCopy: copy,
+        slides_deck_id_ecd: slidesDeckIdEcd || "html",
+        slides_deck_id_client: slidesDeckIdClient || "html",
+        ecd_deck_url: ecdDeckUrl,
+        client_deck_url: clientDeckUrl,
         flow_package_gcs_uri: flowGcsUri,
         flow_package_public_url: flowPublicUrl,
-        slide_count_ecd: 15,
-        slide_count_client: 14,
+        slide_count_ecd: slideCountEcd,
+        slide_count_client: slideCountClient,
       },
       tokenCost: geminiResponse.usage.costUsd,
     })
 
     return NextResponse.json({
-      slides_deck_id_ecd: ecdDeck.presentationId,
-      slides_deck_id_client: clientDeck.presentationId,
-      ecd_deck_url: ecdShareUrl,
-      client_deck_url: clientShareUrl,
+      slides_deck_id_ecd: slidesDeckIdEcd,
+      slides_deck_id_client: slidesDeckIdClient,
+      ecd_deck_url: ecdDeckUrl,
+      client_deck_url: clientDeckUrl,
       flow_package_gcs_uri: flowGcsUri,
       flow_package_public_url: flowPublicUrl,
       cost: geminiResponse.usage,

@@ -32,19 +32,10 @@ function driveClient(): drive_v3.Drive {
 }
 
 function getAuth() {
-  const keyJson = process.env["GCP_SERVICE_ACCOUNT_KEY"]
-  if (keyJson) {
-    const key = JSON.parse(keyJson)
-    return new google.auth.GoogleAuth({
-      credentials: key,
-      scopes: [
-        "https://www.googleapis.com/auth/presentations",
-        "https://www.googleapis.com/auth/drive",
-      ],
-    })
-  }
-  // Fallback: Application Default Credentials
+  // Use service account key file — official pattern for Slides/Drive APIs
+  const keyFile = "./sa-key.json"
   return new google.auth.GoogleAuth({
+    keyFile,
     scopes: [
       "https://www.googleapis.com/auth/presentations",
       "https://www.googleapis.com/auth/drive",
