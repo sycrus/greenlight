@@ -445,24 +445,41 @@ function VisualDNAPanel({
 
               {/* Reference image thumbnail */}
               {imgUrl(ing.generated_reference_uri) ? (
-                <div className="relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={imgUrl(ing.generated_reference_uri)!}
-                    alt={ing.description}
-                    className="w-full rounded border border-zinc-700 object-cover"
-                    style={{ maxHeight: "240px" }}
-                  />
+                <div>
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imgUrl(ing.generated_reference_uri)!}
+                      alt={ing.description}
+                      className="w-full rounded border border-zinc-700 object-cover"
+                      style={{ maxHeight: "240px" }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleGenerate(ing.ingredient_id)}
+                    disabled={generating === ing.ingredient_id}
+                    className="mt-1.5 w-full rounded border border-zinc-600 bg-zinc-800/50 px-2 py-1 text-xs text-zinc-400 hover:border-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {generating === ing.ingredient_id ? (
+                      <span className="inline-flex items-center justify-center gap-1.5">
+                        <span className="inline-block w-2.5 h-2.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                        Regenerating…
+                      </span>
+                    ) : (
+                      "🔄 Regenerate"
+                    )}
+                  </button>
                 </div>
               ) : ing.type !== "brand_asset" ? (
                 <button
                   type="button"
                   onClick={() => handleGenerate(ing.ingredient_id)}
                   disabled={generating === ing.ingredient_id}
-                  className="mt-1 rounded border border-zinc-600 bg-zinc-800 px-3 py-1 text-xs text-zinc-300 hover:border-zinc-400 hover:text-zinc-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="mt-1 w-full rounded border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-400 hover:text-zinc-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {generating === ing.ingredient_id ? (
-                    <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-flex items-center justify-center gap-1.5">
                       <span className="inline-block w-3 h-3 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
                       Generating…
                     </span>
