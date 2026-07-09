@@ -506,6 +506,9 @@ export default function RunStatusPage() {
   const [generatingTerritories, setGeneratingTerritories] = useState(false)
   const [generatingVisualDna, setGeneratingVisualDna] = useState(false)
   const [generatingDeck, setGeneratingDeck] = useState(false)
+  const [reparsingBrief, setReparsingBrief] = useState(false)
+  const [editBriefOpen, setEditBriefOpen] = useState(false)
+  const [editBriefText, setEditBriefText] = useState("")
 
   const fetchStatus = useCallback(async () => {
     if (!runId) return
@@ -526,6 +529,27 @@ export default function RunStatusPage() {
   useEffect(() => {
     fetchStatus()
   }, [fetchStatus])
+
+  // Re-parse brief handler
+  async function handleReparseBrief() {
+    setReparsingBrief(true)
+    setError(null)
+    try {
+      const brandRules = stagesData?.brief_parsing?.["_brandRules"] as Record<string, string> | undefined
+      const res = await fetch("/api/brief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brief: editBriefText, brandRules, runId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? "Re-parse failed")
+      await fetchStatus()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Re-parse failed")
+    } finally {
+      setReparsingBrief(false)
+    }
+  }
 
   // Generate Territories handler
   async function handleGenerateTerritories() {
@@ -669,6 +693,14 @@ export default function RunStatusPage() {
   const ecdPassed = gatesData?.ecd_approval != null
   const clientPassed = gatesData?.client_approval != null
 
+  // Initialize edit brief text from stored raw brief when data loads
+  useEffect(() => {
+    const rawBrief = stagesData?.brief_parsing?.["_rawBrief"] as string | undefined
+    if (rawBrief && !editBriefText) {
+      setEditBriefText(rawBrief)
+    }
+  }, [stagesData, editBriefText])
+
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
       {/* Header */}
@@ -691,6 +723,38 @@ export default function RunStatusPage() {
           </div>
         )}
       </div>
+
+      {/* Edit Brief panel */}
+      {(stagesData?.brief_parsing?.["_rawBrief"] as string | undefined) && (
+        <section className="mb-8">
+          <button
+            type="button"
+            onClick={() => setEditBriefOpen(!editBriefOpen)}
+            className="flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors mb-2"
+          >
+            <span>{editBriefOpen ? "▼" : "▶"}</span>
+            Edit Brief
+          </button>
+          {editBriefOpen && (
+            <div className="rounded-lg border border-zinc-700 bg-zinc-900/50 p-4 space-y-3">
+              <textarea
+                value={editBriefText}
+                onChange={(e) => setEditBriefText(e.target.value)}
+                rows={6}
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleReparseBrief}
+                disabled={reparsingBrief || !editBriefText.trim()}
+                className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {reparsingBrief ? "Re-parsing…" : "Re-parse Brief"}
+              </button>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Stages */}
       <section className="mb-8">
@@ -717,13 +781,14 @@ export default function RunStatusPage() {
 
       {/* Pipeline triggers — buttons to advance each stage */}
 
-      {/* Stage 2 trigger: Generate Territories */}
-      {stagesData && stageStatus(stagesData["brief_parsing"]) === "complete" &&
-        stageStatus(stagesData["territory_generation"]) === "pending" && (
+      {/* Stage 2 trigger: Generate / Regenerate Territories */}
+      {stagesData && stageStatus(stagesData["brief_parsing"]) === "complete" && (
         <section className="mb-8">
           <div className="rounded-lg border border-zinc-700 bg-zinc-900/50 px-4 py-4">
             <p className="text-sm text-zinc-300 mb-3">
-              Brief parsed. Generate 3 creative territories to explore.
+              {stageStatus(stagesData["territory_generation"]) === "complete"
+                ? "Territories generated. Regenerate if you've edited the brief or want new variations."
+                : "Brief parsed. Generate 3 creative territories to explore."}
             </p>
             <button
               type="button"
@@ -736,6 +801,8 @@ export default function RunStatusPage() {
                   <span className="inline-block w-3 h-3 border-2 border-zinc-600 border-t-transparent rounded-full animate-spin" />
                   Generating Territories…
                 </span>
+              ) : stageStatus(stagesData["territory_generation"]) === "complete" ? (
+                "🔄 Regenerate Territories"
               ) : (
                 "🎨 Generate Territories"
               )}
@@ -744,13 +811,14 @@ export default function RunStatusPage() {
         </section>
       )}
 
-      {/* Stage 3 trigger: Encode Visual DNA */}
-      {stagesData && stageStatus(stagesData["territory_generation"]) === "complete" &&
-        stageStatus(stagesData["visual_dna"]) === "pending" && (
+      {/* Stage 3 trigger: Encode / Regenerate Visual DNA */}
+      {stagesData && stageStatus(stagesData["territory_generation"]) === "complete" && (
         <section className="mb-8">
           <div className="rounded-lg border border-zinc-700 bg-zinc-900/50 px-4 py-4">
             <p className="text-sm text-zinc-300 mb-3">
-              3 territories generated. Encode Visual DNA for each territory (calls Gemini once per territory — 3 calls).
+              {stageStatus(stagesData["visual_dna"]) === "complete"
+                ? "Visual DNA encoded. Regenerate if you've edited territories or want refined results."
+                : "3 territories generated. Encode Visual DNA for each territory (calls Gemini once per territory — 3 calls)."}
             </p>
             <button
               type="button"
@@ -763,6 +831,8 @@ export default function RunStatusPage() {
                   <span className="inline-block w-3 h-3 border-2 border-zinc-600 border-t-transparent rounded-full animate-spin" />
                   Encoding Visual DNA…
                 </span>
+              ) : stageStatus(stagesData["visual_dna"]) === "complete" ? (
+                "🔄 Regenerate Visual DNA"
               ) : (
                 "🧬 Encode Visual DNA"
               )}
@@ -799,7 +869,17 @@ export default function RunStatusPage() {
             </div>
           ) : stagesData["output_generation"]?.["ecd_deck_url"] ? (
             <div className="rounded-lg border border-green-800 bg-green-950/30 px-4 py-4 space-y-3">
-              <p className="text-sm font-medium text-green-400">Pre-Production Deck Ready</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-green-400">Pre-Production Deck Ready</p>
+                <button
+                  type="button"
+                  onClick={handleGenerateDeck}
+                  disabled={generatingDeck}
+                  className="rounded bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-40"
+                >
+                  {generatingDeck ? "Regenerating…" : "🔄 Regenerate Deck"}
+                </button>
+              </div>
               <div className="flex flex-wrap gap-3">
                 <a
                   href={stagesData["output_generation"]["ecd_deck_url"] as string}

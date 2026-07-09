@@ -23,9 +23,10 @@ export const runtime = "nodejs"
 
 export async function POST(req: Request) {
   try {
-    const { brief, brandRules } = (await req.json()) as {
+    const { brief, brandRules, runId: existingRunId } = (await req.json()) as {
       brief?: string
       brandRules?: Record<string, string>
+      runId?: string
     }
 
     if (!brief?.trim()) {
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const runId = `run-${Date.now()}-${randomUUID().slice(0, 6)}`
+    const runId = existingRunId ?? `run-${Date.now()}-${randomUUID().slice(0, 6)}`
 
     // Stage 0: write raw brief input (git trace)
     writeBriefInput(runId, brief, brandRules as Record<string, unknown> | undefined)
@@ -108,11 +109,15 @@ export async function POST(req: Request) {
       },
     })
 
-    // Write to Firestore
+    // Write to Firestore (include raw brief for later editing)
     await writeStageRecord({
       stage: "brief-parsing",
       runId,
-      data: parsedBrief,
+      data: {
+        ...parsedBrief,
+        _rawBrief: brief,
+        ...(brandRules !== undefined && { _brandRules: brandRules }),
+      },
       tokenCost: response.usage.costUsd,
       confidenceScore,
     })
