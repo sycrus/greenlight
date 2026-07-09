@@ -49,11 +49,12 @@ interface ErrorResult {
 
 export async function POST(req: Request) {
   try {
-    const { runId, territoryId, ingredientIds, source } = (await req.json()) as {
+    const { runId, territoryId, ingredientIds, source, workflow } = (await req.json()) as {
       runId?: string
       territoryId?: string
       ingredientIds?: string[]
       source?: "gemini" | "comfyui"
+      workflow?: string
     }
 
     const useComfyUI = source === "comfyui"
@@ -142,6 +143,7 @@ export async function POST(req: Request) {
           ? await generateComfyImage({
               prompt,
               ...(negativePrompt !== undefined && { negativePrompt }),
+              ...(workflow !== undefined && { workflow }),
               width: 1024,
               height: 1024,
             })

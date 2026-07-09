@@ -323,6 +323,16 @@ function VisualDNAPanel({
   const [generating, setGenerating] = useState<string | null>(null)
   const [genError, setGenError] = useState<string | null>(null)
   const [imageSource, setImageSource] = useState<"gemini" | "comfyui">("gemini")
+  const [comfyWorkflow, setComfyWorkflow] = useState("")
+  const [workflows, setWorkflows] = useState<string[]>([])
+
+  // Load available ComfyUI workflows
+  useEffect(() => {
+    fetch("/api/comfyui-workflows")
+      .then((r) => r.json())
+      .then((d) => setWorkflows(d.workflows ?? []))
+      .catch(() => {})
+  }, [])
 
   async function handleGenerate(ingredientId: string) {
     setGenerating(ingredientId)
@@ -331,7 +341,10 @@ function VisualDNAPanel({
       const res = await fetch("/api/generate-references", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runId, territoryId, ingredientIds: [ingredientId], source: imageSource }),
+        body: JSON.stringify({
+            runId, territoryId, ingredientIds: [ingredientId], source: imageSource,
+            ...(imageSource === "comfyui" && comfyWorkflow && { workflow: comfyWorkflow }),
+          }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Generation failed")
@@ -412,14 +425,28 @@ function VisualDNAPanel({
           <h4 className="text-xs font-semibold text-zinc-400">
             Ingredients ({vd.ingredients.length})
           </h4>
-          <select
-            value={imageSource}
-            onChange={(e) => setImageSource(e.target.value as "gemini" | "comfyui")}
-            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-400 focus:outline-none"
-          >
-            <option value="gemini">Gemini</option>
-            <option value="comfyui">ComfyUI</option>
-          </select>
+          <div className="flex items-center gap-2">
+            {imageSource === "comfyui" && workflows.length > 0 && (
+              <select
+                value={comfyWorkflow}
+                onChange={(e) => setComfyWorkflow(e.target.value)}
+                className="rounded border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-500 focus:outline-none"
+              >
+                <option value="">Default SDXL</option>
+                {workflows.map((w) => (
+                  <option key={w} value={w}>{w}</option>
+                ))}
+              </select>
+            )}
+            <select
+              value={imageSource}
+              onChange={(e) => setImageSource(e.target.value as "gemini" | "comfyui")}
+              className="rounded border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-400 focus:outline-none"
+            >
+              <option value="gemini">Gemini</option>
+              <option value="comfyui">ComfyUI</option>
+            </select>
+          </div>
         </div>
         {genError && (
           <div className="mb-2 rounded border border-red-800 bg-red-950/30 px-3 py-1.5 text-xs text-red-400">

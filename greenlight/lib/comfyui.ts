@@ -48,6 +48,36 @@ export interface ImageGenerationResult {
   model: string
 }
 
+// ── Workflow loading ────────────────────────────────────────────────────────────
+
+import { readFileSync, existsSync } from "fs"
+import { join } from "path"
+
+const WORKFLOWS_DIR = join(process.cwd(), "comfyui", "workflows")
+
+function loadWorkflow(name: string): Record<string, unknown> | null {
+  const filePath = join(WORKFLOWS_DIR, name.endsWith(".json") ? name : `${name}.json`)
+  if (!existsSync(filePath)) {
+    console.warn(`[comfyui] Workflow not found: ${filePath}`)
+    return null
+  }
+  try {
+    return JSON.parse(readFileSync(filePath, "utf-8"))
+  } catch (err) {
+    console.error(`[comfyui] Failed to parse workflow ${filePath}:`, err)
+    return null
+  }
+}
+
+function listWorkflows(): string[] {
+  try {
+    const { readdirSync } = require("fs")
+    return readdirSync(WORKFLOWS_DIR).filter((f: string) => f.endsWith(".json"))
+  } catch {
+    return []
+  }
+}
+
 // ── Submit prompt ──────────────────────────────────────────────────────────────
 
 function buildDefaultWorkflow(options: ImageGenerationOptions) {
@@ -112,10 +142,28 @@ function buildDefaultWorkflow(options: ImageGenerationOptions) {
   }
 }
 
+export interface ComfyPromptOptions extends ImageGenerationOptions {
+  /** Name of a workflow JSON file in comfyui/workflows/ (without .json extension).
+   * If provided, loads that workflow and injects the prompt into it. */
+  workflow?: string
+}
+
 export async function submitPrompt(
-  options: ImageGenerationOptions
+  options: ComfyPromptOptions
 ): Promise<ComfyPromptResult> {
-  const workflow = buildDefaultWorkflow(options)
+  let workflow: Record<string, unknown>
+
+  if (options.workflow) {
+    const loaded = loadWorkflow(options.workflow)
+    if (!loaded) {
+      throw new Error(`Workflow '${options.workflow}' not found in comfyui/workflows/`)
+    }
+    workflow = loaded
+    // Inject prompt into the workflow if it has CLIPTextEncode nodes
+    injectPrompt(workflow, options.prompt, options.negativePrompt)
+  } else {
+    workflow = buildDefaultWorkflow(options)
+  }
 
   const res = await fetch(`${COMFY_URL}/prompt`, {
     method: "POST",
@@ -131,6 +179,26 @@ export async function submitPrompt(
   const data = (await res.json()) as ComfyPromptResult
   console.log(`[comfyui] Prompt submitted: ${data.prompt_id}`)
   return data
+}
+
+/** Inject positive/negative prompts into CLIPTextEncode nodes in a workflow */
+function injectPrompt(
+  workflow: Record<string, unknown>,
+  positive: string,
+  negative?: string
+): void {
+  for (const [_nodeId, node] of Object.entries(workflow)) {
+    const n = node as Record<string, unknown>
+    if (n["class_type"] === "CLIPTextEncode") {
+      const inputs = n["inputs"] as Record<string, unknown>
+      const title = inputs["_meta"] as Record<string, string> | undefined
+      if (title?.["title"] === "Positive" || (Object.keys(workflow).length <= 5)) {
+        inputs["text"] = positive
+      } else if (title?.["title"] === "Negative" || negative) {
+        inputs["text"] = negative ?? "ugly, blurry, low quality, distorted"
+      }
+    }
+  }
 }
 
 // ── Poll for completion ────────────────────────────────────────────────────────
@@ -192,7 +260,7 @@ export async function downloadImage(
 // ── Generate image (submit + poll + download) ──────────────────────────────────
 
 export async function generateImage(
-  options: ImageGenerationOptions
+  options: ComfyPromptOptions
 ): Promise<ImageGenerationResult> {
   const { prompt_id } = await submitPrompt(options)
   const outputs = await waitForCompletion(prompt_id)
