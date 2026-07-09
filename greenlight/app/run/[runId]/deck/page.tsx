@@ -258,7 +258,18 @@ export default function DeckPage() {
 
         // Load Visual DNA territories for images
         const vdData = data.stages?.visual_dna?.territories as Record<string, VisualDnaData> | undefined
-        if (vdData) setVisualDnas(vdData)
+        if (vdData) {
+          setVisualDnas(vdData)
+          // Debug: log image URIs
+          for (const [tid, vd] of Object.entries(vdData)) {
+            const ings = (vd as VisualDnaData).ingredients ?? []
+            for (const ing of ings) {
+              console.log(`[deck] ${tid}/${ing.ingredient_id}: gen=${ing.generated_reference_uri?.slice(0, 60)} ref=${ing.reference_image_uri?.slice(0, 60)}`)
+            }
+          }
+        } else {
+          console.warn("[deck] No visual_dna.territories found in API response")
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load deck")
       } finally {
