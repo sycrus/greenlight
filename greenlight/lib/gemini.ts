@@ -398,7 +398,7 @@ export function validateVisualDNA(
 
 // ── Imagen 3 image generation ─────────────────────────────────────────────────
 
-const IMAGEN_MODEL = "gemini-2.0-flash-image-generation" // via generateContent
+const IMAGEN_MODEL = "gemini-2.5-flash" // Gemini 2.5 Flash supports native image generation
 const IMAGEN_COST_PER_IMAGE = 0.02 // approximate cost per reference image
 
 export interface ImageGenerationOptions {
@@ -414,12 +414,13 @@ export interface ImageGenerationResult {
 }
 
 /**
- * Generate a reference image using Gemini image generation via generateContent.
+ * Generate a reference image using Gemini's native image generation.
  *
- * Uses the same Vertex AI SDK as callGemini() but with an image-specific model.
- * The model returns inlineData (base64 image) in the response parts.
+ * Gemini 2.5 Flash can output images via inlineData in response parts.
+ * The same generateContent API is used — the model detects the image
+ * generation intent from the prompt.
  *
- * FALLBACK: If image generation fails for any reason, generates a minimal
+ * FALLBACK: If image generation fails for any reason, generates a visible
  * placeholder PNG so the pipeline functions end-to-end.
  */
 export async function generateImage(
@@ -429,14 +430,17 @@ export async function generateImage(
     const model = vertexAI().getGenerativeModel({
       model: IMAGEN_MODEL,
       generationConfig: {
-        maxOutputTokens: 4096,
+        maxOutputTokens: 8192,
+        temperature: 0.9,
       },
     })
 
+    // Explicit image generation instruction
     const prompt = [
+      "Generate an image:",
       options.prompt,
-      "photorealistic, 1:1 aspect ratio",
-      options.negativePrompt ? `Avoid: ${options.negativePrompt}` : "",
+      "1:1 square format, photorealistic",
+      options.negativePrompt ? `Do NOT include: ${options.negativePrompt}` : "",
     ]
       .filter(Boolean)
       .join(". ")
@@ -453,7 +457,9 @@ export async function generateImage(
       const p = part as unknown as Record<string, unknown>
       if (p["inlineData"] && typeof p["inlineData"] === "object") {
         const inlineData = p["inlineData"] as Record<string, unknown>
+        const mimeType = (inlineData["mimeType"] as string) ?? "image/png"
         if (typeof inlineData["data"] === "string") {
+          console.log(`[gemini] Image generated successfully (${mimeType}, ${inlineData["data"].length} chars base64)`)
           return {
             imageBuffer: Buffer.from(inlineData["data"], "base64"),
             costUsd: IMAGEN_COST_PER_IMAGE,
@@ -461,43 +467,98 @@ export async function generateImage(
           }
         }
       }
+      // Some models return image URLs instead of inline data
+      if (p["fileData"] && typeof p["fileData"] === "object") {
+        const fd = p["fileData"] as Record<string, unknown>
+        console.log(`[gemini] Model returned fileData instead of inlineData: ${JSON.stringify(fd).slice(0, 300)}`)
+      }
     }
 
-    // If no inline image, log what we got and fall back
+    // Log what we got and fall back
     const text = response.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
-    console.warn(`[gemini] Image model returned no inline image. Text: ${text.slice(0, 200)}`)
+    console.warn(`[gemini] No inline image in response. Text (first 300 chars): ${(text as string).slice(0, 300)}`)
+    console.warn(`[gemini] Parts count: ${parts.length}, types: ${parts.map((p: unknown) => Object.keys(p as object)[0]).join(", ")}`)
     return generatePlaceholder(options)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.warn(`[gemini] Image generation failed: ${message.slice(0, 200)} — using placeholder`)
+    console.warn(`[gemini] Image generation failed: ${message.slice(0, 300)} — using visible placeholder`)
     return generatePlaceholder(options)
   }
 }
 
-/** Generate a minimal placeholder PNG when image generation is unavailable. */
-function generatePlaceholder(_options: ImageGenerationOptions): ImageGenerationResult {
-  const png = createMinimalPng(512, 512)
+/**
+ * Generate a visible placeholder PNG when image generation is unavailable.
+ * Creates a 512×512 image with colored background so it's clearly visible in the UI.
+ */
+function generatePlaceholder(options: ImageGenerationOptions): ImageGenerationResult {
+  const png = createPlaceholderPng(512, 512)
   return {
     imageBuffer: png,
-    costUsd: 0, // placeholder is free
+    costUsd: 0,
     model: "placeholder",
   }
 }
 
-/** Create a minimal solid-color placeholder PNG. */
-function createMinimalPng(_width: number, _height: number): Buffer {
-  // Minimal 1x1 gray PNG (valid, tiny, recognizable as placeholder)
-  // Replaced by real Imagen 3 images once allowlist is approved
-  // PNG signature + IHDR + IDAT + IEND for a single gray pixel
-  return Buffer.from([
-    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
-    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
-    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1 pixel (scalable)
-    0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
-    0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, // IDAT chunk
-    0x08, 0xD7, 0x63, 0x60, 0x60, 0x60, 0x00, 0x00,
-    0x00, 0x04, 0x00, 0x01, 0x27, 0x34, 0x0A, 0x00,
-    0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, // IEND chunk
-    0x42, 0x60, 0x82,
-  ])
+/**
+ * Create a visible placeholder PNG (512×512) using Node.js zlib.
+ * Shows a dark gray background with a lighter center stripe — visibly
+ * distinct from a broken image so users can tell it loaded.
+ */
+function createPlaceholderPng(width: number, height: number): Buffer {
+  const zlib = require("zlib") as typeof import("zlib")
+
+  // Build raw pixel data with filter byte per row
+  const rawData: Buffer[] = []
+  for (let y = 0; y < height; y++) {
+    rawData.push(Buffer.from([0])) // filter: None
+    const row = Buffer.alloc(width * 4)
+    for (let x = 0; x < width; x++) {
+      const offset = x * 4
+      // Create a gradient/pattern: darker edges, lighter center
+      const isCenter = Math.abs(x - width / 2) < 60 || Math.abs(y - height / 2) < 60
+      row[offset] = isCenter ? 0x55 : 0x2A     // R
+      row[offset + 1] = isCenter ? 0x55 : 0x2A // G
+      row[offset + 2] = isCenter ? 0x55 : 0x2A // B
+      row[offset + 3] = 0xFF                     // A (fully opaque)
+    }
+    rawData.push(row)
+  }
+
+  const uncompressed = Buffer.concat(rawData)
+  const compressed = zlib.deflateSync(uncompressed)
+
+  // PNG chunks
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+
+  // IHDR
+  const ihdrData = Buffer.alloc(13)
+  ihdrData.writeUInt32BE(width, 0)   // width
+  ihdrData.writeUInt32BE(height, 4)  // height
+  ihdrData.writeUInt8(8, 8)          // bit depth
+  ihdrData.writeUInt8(6, 9)          // color type: RGBA
+  ihdrData.writeUInt8(0, 10)         // compression
+  ihdrData.writeUInt8(0, 11)         // filter
+  ihdrData.writeUInt8(0, 12)         // interlace
+  const ihdr = createChunk("IHDR", ihdrData)
+
+  // IDAT
+  const idat = createChunk("IDAT", compressed)
+
+  // IEND
+  const iend = createChunk("IEND", Buffer.alloc(0))
+
+  return Buffer.concat([signature, ihdr, idat, iend])
+}
+
+/** Build a PNG chunk: 4-byte length + 4-byte type + data + 4-byte CRC */
+function createChunk(type: string, data: Buffer): Buffer {
+  const { crc32 } = require("zlib") as typeof import("zlib")
+  const length = Buffer.alloc(4)
+  length.writeUInt32BE(data.length, 0)
+  const typeBuffer = Buffer.from(type, "ascii")
+  const crcInput = Buffer.concat([typeBuffer, data])
+  const crcValue = crc32(crcInput)
+  const crcBuf = Buffer.alloc(4)
+  crcBuf.writeUInt32BE(crcValue, 0)
+  return Buffer.concat([length, typeBuffer, data, crcBuf])
 }

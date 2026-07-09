@@ -69,7 +69,7 @@ describe("generateImage", () => {
     expect(result.imageBuffer).toBeInstanceOf(Buffer)
     expect(result.imageBuffer.toString()).toBe("imagebytes")
     expect(result.costUsd).toBe(0.02)
-    expect(result.model).toBe("gemini-2.0-flash-image-generation")
+    expect(result.model).toBe("gemini-2.5-flash")
   })
 
   it("decodes base64 inlineData into Buffer", async () => {
@@ -84,7 +84,7 @@ describe("generateImage", () => {
     await generateImage({ prompt: "Test prompt" })
 
     expect(mockGetGenerativeModel).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gemini-2.0-flash-image-generation" })
+      expect.objectContaining({ model: "gemini-2.5-flash" })
     )
   })
 
@@ -104,7 +104,7 @@ describe("generateImage", () => {
     const contents = callArgs["contents"] as Array<Record<string, unknown>>
     const parts = contents[0]?.["parts"] as Array<Record<string, unknown>>
     expect(parts[0]?.["text"]).toContain("photorealistic")
-    expect(parts[0]?.["text"]).toContain("1:1 aspect ratio")
+    expect(parts[0]?.["text"]).toContain("1:1 square format")
   })
 
   it("includes negative prompt when provided", async () => {
@@ -128,12 +128,12 @@ describe("generateImage", () => {
     expect(parts[0]?.["text"]).not.toContain("Avoid:")
   })
 
-  it("sets maxOutputTokens to 4096", async () => {
+  it("sets maxOutputTokens to 8192", async () => {
     await generateImage({ prompt: "Test" })
 
     expect(mockGetGenerativeModel).toHaveBeenCalledWith(
       expect.objectContaining({
-        generationConfig: expect.objectContaining({ maxOutputTokens: 4096 }),
+        generationConfig: expect.objectContaining({ maxOutputTokens: 8192 }),
       })
     )
   })
