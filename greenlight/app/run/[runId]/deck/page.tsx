@@ -81,7 +81,7 @@ function imgUrl(uri: string | null | undefined): string | null {
 }
 
 function ingredientImage(ing: IngredientData): string | null {
-  return ingredientImage(ing) ?? imgUrl(ing.reference_image_uri)
+  return imgUrl(ing.generated_reference_uri) ?? imgUrl(ing.reference_image_uri)
 }
 
 // ── Slide Components ───────────────────────────────────────────────────────────
