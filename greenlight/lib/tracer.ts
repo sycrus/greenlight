@@ -58,7 +58,21 @@ function agentTraceDir(runId: string): string {
 }
 
 function ensureDir(dir: string): void {
-  mkdirSync(dir, { recursive: true })
+  try {
+    mkdirSync(dir, { recursive: true })
+  } catch {
+    // Read-only filesystem (e.g. Vercel serverless) — traces are non-essential
+  }
+}
+
+function safeWrite(filePath: string, content: string): boolean {
+  try {
+    writeFileSync(filePath, content, "utf-8")
+    return true
+  } catch {
+    // Read-only filesystem — trace writes are best-effort
+    return false
+  }
 }
 
 function timestamp(): string {
@@ -144,7 +158,7 @@ export function writeAgentTrace(input: AgentTraceInput): AgentTrace {
 
   const fileName = `${input.stage}.md`
   const filePath = join(dir, fileName)
-  writeFileSync(filePath, content, "utf-8")
+  safeWrite(filePath, content)
 
   const writtenAt = timestamp()
 
@@ -176,7 +190,7 @@ export function writeStageOutput(input: StageTraceInput): StageTrace {
 
   const fileName = `${num}-${stageName}.json`
   const filePath = join(dir, fileName)
-  writeFileSync(filePath, JSON.stringify(output, null, 2) + "\n", "utf-8")
+  safeWrite(filePath, JSON.stringify(output, null, 2) + "\n")
 
   return {
     ...input,
@@ -216,7 +230,7 @@ export function writeBriefInput(runId: string, brief: string, brandRules?: Recor
 
   const fileName = "01-brief-input.md"
   const filePath = join(dir, fileName)
-  writeFileSync(filePath, content.join("\n"), "utf-8")
+  safeWrite(filePath, content.join("\n"))
   return `greenlight/traces/runs/${runId}/${fileName}`
 }
 
@@ -237,7 +251,7 @@ export function writeRunSummary(runId: string, summary: Record<string, unknown>)
 
   const fileName = "09-run-summary.json"
   const filePath = join(dir, fileName)
-  writeFileSync(filePath, JSON.stringify(output, null, 2) + "\n", "utf-8")
+  safeWrite(filePath, JSON.stringify(output, null, 2) + "\n")
 
   return {
     stage: "gate-client", // summary is written after final gate

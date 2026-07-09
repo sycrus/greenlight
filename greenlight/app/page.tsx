@@ -83,13 +83,13 @@ export default function HomePage() {
             Brand Rules (optional)
           </summary>
           <div className="space-y-4 px-4 pb-4">
-            {[
+            {([
               ["palette", "Palette (hex values, comma-separated)"],
               ["typography", "Typography"],
               ["logoUsage", "Logo usage rules"],
               ["restrictedImagery", "Restricted imagery"],
               ["competitorNames", "Competitor names"],
-            ].map(([key, label]) => (
+            ] as const).map(([key, label]) => (
               <div key={key}>
                 <label className="mb-1 block text-xs text-zinc-500">{label}</label>
                 <input

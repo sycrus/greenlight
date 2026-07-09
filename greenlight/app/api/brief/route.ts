@@ -76,7 +76,7 @@ export async function POST(req: Request) {
 
     // Verification checks
     const verification = [
-      { check: "schema valid", passed: valid, detail: valid ? undefined : gaps.join(", ") },
+      { check: "schema valid", passed: valid, ...(!valid && { detail: gaps.join(", ") }) },
       { check: "confidence ≥ 0.5", passed: confidenceScore >= 0.5, detail: `confidence: ${confidenceScore}` },
       { check: "brief_gaps populated", passed: Array.isArray(parsedBrief["brief_gaps"]) && (parsedBrief["brief_gaps"] as unknown[]).length >= 0 },
     ]

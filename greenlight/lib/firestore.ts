@@ -55,7 +55,7 @@ export interface StageRecord {
 export interface GateRecord {
   gate: string
   runId: string
-  approvalStatus: "APPROVED" | "APPROVED_WITH_NOTES" | "REVISIONS_REQUIRED"
+  approvalStatus: "APPROVED" | "APPROVED_WITH_REVISIONS" | "APPROVED_WITH_NOTES" | "REVISIONS_REQUIRED"
   territorySelected: string
   notes: string | null
   approverName: string
@@ -102,7 +102,7 @@ export async function writeRunSummary(
   runId: string,
   summary: Record<string, unknown>
 ): Promise<void> {
-  const docRef = db().doc(`runs/${runId}/summary`)
+  const docRef = db().doc(`runs/${runId}/summaries/main`)
   await docRef.set({
     ...summary,
     completedAt: FieldValue.serverTimestamp(),
@@ -133,6 +133,6 @@ export async function readGateRecord(
 export async function readRunSummary(
   runId: string
 ): Promise<Record<string, unknown> | null> {
-  const doc = await db().doc(`runs/${runId}/summary`).get()
+  const doc = await db().doc(`runs/${runId}/summaries/main`).get()
   return doc.exists ? (doc.data() as Record<string, unknown>) : null
 }

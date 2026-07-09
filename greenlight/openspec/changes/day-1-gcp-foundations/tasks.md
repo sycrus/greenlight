@@ -16,7 +16,7 @@
 - [x] Build `POST /api/brief` route — calls Gemini 2.5 Flash
 - [x] Build `GET /api/run/[runId]` route — reads Firestore
 - [x] Build brief input page (`/`) — textarea + brand rules form fields
-- [ ] Build pipeline status page (`/run/[runId]`)
+- [x] Build pipeline status page (`/run/[runId]`)
 
 ## 3. Gemini 2.5 Flash brief parsing
 - [x] Implement `lib/gemini.ts` — adapter wrapping `@google-cloud/vertexai` (switched from `PredictionServiceClient`)
@@ -33,13 +33,13 @@
 
 ## 5. Tests (TDD)
 - [x] `tests/brief-parsing/brief-parsing.test.ts` — schema validation (39 tests pass)
-- [ ] `tests/brief-parsing/gemini-adapter.test.ts` — API call shape + error handling
-- [ ] `tests/brief-parsing/firestore-write.test.ts` — stage record shape
+- [x] `tests/brief-parsing/gemini-adapter.test.ts` — API call shape + error handling (33 tests)
+- [x] `tests/brief-parsing/firestore-write.test.ts` — stage record shape (27 tests)
 
 ## 6. Deploy
-- [ ] Deploy Next.js to Vercel
-- [ ] Verify Firestore writes from deployed app
-- [ ] Verify Gemini calls from deployed app
+- [x] Deploy Next.js to Vercel
+- [x] Verify Firestore writes from deployed app
+- [x] Verify Gemini calls from deployed app
 
 ## Implementation notes
 
