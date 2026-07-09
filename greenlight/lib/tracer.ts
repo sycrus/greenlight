@@ -47,6 +47,38 @@ const STAGE_DISPLAY_NAME: Record<PipelineStage, string> = {
   "gate-client": "Gate 2 — Client Approval",
 }
 
+// ── Image generation trace ──────────────────────────────────────────────────────
+
+export interface ImageGenTrace {
+  runId: string
+  territoryId: string
+  ingredientId: string
+  source: "gemini" | "comfyui"
+  workflow?: string
+  prompt: string
+  result: "success" | "error"
+  filename?: string
+  localUrl?: string
+  error?: string
+  durationMs: number
+}
+
+/** Write a ComfyUI/Gemini image generation trace for audit */
+export function writeImageGenTrace(trace: ImageGenTrace): void {
+  const dir = runDir(trace.runId)
+  ensureDir(dir)
+
+  const filename = `06-image-gen_${trace.territoryId}_${trace.ingredientId}_${timestamp().replace(/[:.]/g, "-")}.json`
+  const filePath = join(dir, filename)
+
+  const record = {
+    timestamp: timestamp(),
+    ...trace,
+  }
+
+  safeWrite(filePath, JSON.stringify(record, null, 2))
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function runDir(runId: string): string {

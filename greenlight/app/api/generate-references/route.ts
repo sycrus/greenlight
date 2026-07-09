@@ -15,6 +15,7 @@ import { generateImage as generateComfyImage } from "@greenlight/lib/comfyui"
 import { uploadToGcs, gcsToHttps } from "@greenlight/lib/gcs"
 import { readStageRecord, writeStageRecord } from "@greenlight/lib/firestore"
 import { buildIngredientPrompt } from "@greenlight/lib/prompts/ideogram-prompt"
+import { writeImageGenTrace } from "@greenlight/lib/tracer"
 
 export const runtime = "nodejs"
 
@@ -129,6 +130,8 @@ export async function POST(req: Request) {
     let totalCost = 0
     let generationCount = 0
 
+    let imagePrompt = ""
+
     for (const ing of toGenerate) {
       try {
         // Assemble prompt from ingredient + territory context
@@ -140,7 +143,7 @@ export async function POST(req: Request) {
           : undefined
 
         // Generate image — Gemini or ComfyUI
-        let imagePrompt: string = prompt
+        imagePrompt = prompt
         if (useComfyUI) {
           // Build Ideogram-structured prompt for ComfyUI
           const palette = Array.isArray(vd["palette"])
@@ -197,6 +200,21 @@ export async function POST(req: Request) {
           imageUrl = upload.publicUrl
         }
 
+        // Write image generation trace
+        writeImageGenTrace({
+          runId,
+          territoryId: territoryId!,
+          ingredientId: ing.ingredient_id,
+          source: useComfyUI ? "comfyui" : "gemini",
+          ...(workflow !== undefined && { workflow }),
+          prompt: imagePrompt,
+          result: "success",
+          ...(useComfyUI && "localUrl" in result
+            ? { localUrl: (result as unknown as { localUrl: string }).localUrl }
+            : { filename: String(ing.ingredient_id) }),
+          durationMs: 0,
+        })
+
         // Update ingredient in memory
         ing.generated_reference_uri = imageUri
 
@@ -213,6 +231,20 @@ export async function POST(req: Request) {
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error"
         console.error(`[generate-references] Failed for ${ing.ingredient_id}:`, message)
+
+        // Write error trace
+        writeImageGenTrace({
+          runId,
+          territoryId: territoryId!,
+          ingredientId: ing.ingredient_id,
+          source: useComfyUI ? "comfyui" : "gemini",
+          ...(workflow !== undefined && { workflow }),
+          prompt: imagePrompt,
+          result: "error",
+          error: message,
+          durationMs: 0,
+        })
+
         errors.push({
           ingredient_id: ing.ingredient_id,
           error: message,
