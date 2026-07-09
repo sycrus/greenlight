@@ -60,30 +60,51 @@ describe("generateImage", () => {
 
     await generateImage({ prompt: "A test image prompt" })
 
+    // First call tries vertexai/gemini-2.5-flash-image
     expect(mockGenerate).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: expect.stringContaining("imagen"),
+        model: expect.stringContaining("gemini-2.5-flash-image"),
         prompt: expect.stringContaining("A test image prompt"),
       })
     )
   })
 
-  it("includes square format by default", async () => {
+  it("tries next model when first fails", async () => {
+    // First model fails with text, second succeeds
+    mockGenerate
+      .mockResolvedValueOnce({
+        text: "I cannot generate images",
+        media: null,
+        usage: { inputTokens: 0, outputTokens: 0 },
+      })
+      .mockResolvedValueOnce({
+        text: "",
+        media: { url: `data:image/png;base64,${Buffer.from("second-model-image").toString("base64").padEnd(120, "A")}` },
+        usage: { inputTokens: 0, outputTokens: 0 },
+      })
+
+    const result = await generateImage({ prompt: "Test" })
+    expect(result.imageBuffer.toString().startsWith("second-model-image")).toBe(true)
+    expect(mockGenerate).toHaveBeenCalledTimes(2)
+  })
+
+  it("includes photorealistic and format in prompt", async () => {
     mockGenerate.mockResolvedValue({
       text: "",
-      media: { url: "data:image/png;base64,YQ==" },
+      media: { url: `data:image/png;base64,${Buffer.from("test").toString("base64").padEnd(120, "A")}` },
       usage: { inputTokens: 0, outputTokens: 0 },
     })
 
     await generateImage({ prompt: "Test" })
-    expect(mockGenerate.mock.calls[0]?.[0]?.prompt).toContain("square 1:1 format")
-    expect(mockGenerate.mock.calls[0]?.[0]?.prompt).toContain("photorealistic")
+    const callPrompt = mockGenerate.mock.calls[0]?.[0]?.prompt as string
+    expect(callPrompt).toContain("square 1:1 format")
+    expect(callPrompt).toContain("photorealistic")
   })
 
   it("uses 9:16 format when aspectRatio is set", async () => {
     mockGenerate.mockResolvedValue({
       text: "",
-      media: { url: "data:image/png;base64,YQ==" },
+      media: { url: `data:image/png;base64,${Buffer.from("test").toString("base64").padEnd(120, "A")}` },
       usage: { inputTokens: 0, outputTokens: 0 },
     })
 
@@ -91,21 +112,25 @@ describe("generateImage", () => {
     expect(mockGenerate.mock.calls[0]?.[0]?.prompt).toContain("vertical 9:16 format")
   })
 
-  it("falls back to placeholder when generate throws", async () => {
-    mockGenerate.mockRejectedValue(new Error("Imagen not available"))
+  it("falls back to placeholder when all models throw", async () => {
+    // Both models throw
+    mockGenerate
+      .mockRejectedValueOnce(new Error("First model unavailable"))
+      .mockRejectedValueOnce(new Error("Second model unavailable"))
 
     const result = await generateImage({ prompt: "Test" })
     expect(result.model).toBe("placeholder")
     expect(result.costUsd).toBe(0)
     expect(result.imageBuffer).toBeInstanceOf(Buffer)
+    expect(result.error).toContain("First model unavailable")
+    expect(result.error).toContain("Second model unavailable")
   })
 
-  it("falls back to placeholder when media is null", async () => {
-    mockGenerate.mockResolvedValue({
-      text: "No image generated",
-      media: null,
-      usage: { inputTokens: 0, outputTokens: 0 },
-    })
+  it("falls back to placeholder when all models return no media", async () => {
+    // Both models return text, no media
+    mockGenerate
+      .mockResolvedValueOnce({ text: "No image", media: null, usage: { inputTokens: 0, outputTokens: 0 } })
+      .mockResolvedValueOnce({ text: "Cannot generate", media: null, usage: { inputTokens: 0, outputTokens: 0 } })
 
     const result = await generateImage({ prompt: "Test" })
     expect(result.model).toBe("placeholder")
@@ -113,11 +138,10 @@ describe("generateImage", () => {
   })
 
   it("falls back to placeholder when base64 is too short", async () => {
-    mockGenerate.mockResolvedValue({
-      text: "",
-      media: { url: "data:image/png;base64,abc" },
-      usage: { inputTokens: 0, outputTokens: 0 },
-    })
+    // Both models return too-short base64
+    mockGenerate
+      .mockResolvedValueOnce({ text: "", media: { url: "data:image/png;base64,abc" }, usage: { inputTokens: 0, outputTokens: 0 } })
+      .mockResolvedValueOnce({ text: "", media: { url: "data:image/png;base64,xyz" }, usage: { inputTokens: 0, outputTokens: 0 } })
 
     const result = await generateImage({ prompt: "Test" })
     expect(result.model).toBe("placeholder")
@@ -140,5 +164,15 @@ describe("generateImage", () => {
 
     const result = await generateImage({ prompt: "Test" })
     expect(result.costUsd).toBe(0)
+  })
+
+  it("includes error messages from all failed models", async () => {
+    mockGenerate
+      .mockResolvedValueOnce({ text: "no image gen capability", media: null, usage: { inputTokens: 0, outputTokens: 0 } })
+      .mockResolvedValueOnce({ text: "imagen not available", media: null, usage: { inputTokens: 0, outputTokens: 0 } })
+
+    const result = await generateImage({ prompt: "Test" })
+    expect(result.error).toContain("no image gen")
+    expect(result.error).toContain("imagen not available")
   })
 })

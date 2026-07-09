@@ -11,7 +11,7 @@
  */
 
 import { genkit, z } from "genkit"
-import { vertexAI } from "@genkit-ai/google-genai"
+import { vertexAI, googleAI } from "@genkit-ai/google-genai"
 
 // ── Client ───────────────────────────────────────────────────────────────────
 
@@ -27,14 +27,17 @@ export function setAiInstance(mock: ReturnType<typeof genkit>): void {
 
 function ai() {
   if (!_ai) {
-    _ai = genkit({
-      plugins: [
-        vertexAI({
-          projectId: PROJECT,
-          location: LOCATION,
-        }),
-      ],
-    })
+    const plugins: Parameters<typeof genkit>[0]["plugins"] = [
+      vertexAI({
+        projectId: PROJECT,
+        location: LOCATION,
+      }),
+    ]
+    // Add googleAI plugin for image generation if API key is available
+    if (process.env["GEMINI_API_KEY"]) {
+      plugins.push(googleAI({ apiKey: process.env["GEMINI_API_KEY"] }))
+    }
+    _ai = genkit({ plugins })
   }
   return _ai
 }
@@ -156,55 +159,63 @@ export function parseGeminiJson(text: string): unknown | null {
   catch { return null }
 }
 
-// ── Image generation (Imagen 3 via Genkit) ──────────────────────────────────
+// ── Image generation (Imagen + Gemini image models) ─────────────────────────
 
-const IMAGEN_MODEL = "vertexai/imagen-3.0-generate-002"
 const IMAGEN_COST_PER_IMAGE = 0.02
+
+// Models to try in order: Gemini image (Vertex AI, no API key needed) → Imagen (Google AI, needs API key)
+const IMAGE_MODELS = [
+  { ref: "vertexai/gemini-2.5-flash-image", label: "Gemini 2.5 Flash Image (Vertex AI)" },
+  { ref: "googleai/imagen-4.0-fast-generate-001", label: "Imagen 4 Fast (Google AI)" },
+]
 
 export async function generateImage(
   options: ImageGenerationOptions
 ): Promise<ImageGenerationResult> {
-  try {
-    const prompt = [
-      options.prompt,
-      options.aspectRatio === "9:16" ? "vertical 9:16 format" : "square 1:1 format",
-      "photorealistic, high quality",
-    ].join(". ")
+  const prompt = [
+    "Generate a photorealistic image:",
+    options.prompt,
+    options.aspectRatio === "9:16" ? "vertical 9:16 format" : "square 1:1 format",
+    "high quality, professional",
+  ].join(". ")
 
-    // Try Imagen via Genkit — no output.format needed, Imagen returns media natively
-    const response = await ai().generate({
-      model: IMAGEN_MODEL,
-      prompt,
-    })
+  const errors: string[] = []
 
-    // Check for media in response
-    const media = response.media
-    let errorDetail = ""
+  for (const model of IMAGE_MODELS) {
+    try {
+      console.log(`[genkit] Trying image model: ${model.label}`)
+      const response = await ai().generate({
+        model: model.ref,
+        prompt,
+      })
 
-    if (media?.url) {
-      const base64 = media.url.replace(/^data:image\/\w+;base64,/, "")
-      if (base64 && base64.length > 100) {
-        console.log(`[genkit] Imagen generated image (${base64.length} chars base64)`)
-        return {
-          imageBuffer: Buffer.from(base64, "base64"),
-          costUsd: IMAGEN_COST_PER_IMAGE,
-          model: IMAGEN_MODEL,
+      const media = response.media
+      if (media?.url) {
+        const base64 = media.url.replace(/^data:image\/\w+;base64,/, "")
+        if (base64 && base64.length > 100) {
+          console.log(`[genkit] ${model.label} succeeded (${base64.length} chars base64)`)
+          return {
+            imageBuffer: Buffer.from(base64, "base64"),
+            costUsd: IMAGEN_COST_PER_IMAGE,
+            model: model.ref,
+          }
         }
+        errors.push(`${model.label}: base64 too short (${base64.length} chars)`)
+      } else if (response.text) {
+        errors.push(`${model.label}: returned text, not image — "${response.text.slice(0, 100)}"`)
+      } else {
+        errors.push(`${model.label}: no media or text — finishReason: ${response.finishReason ?? "unknown"}`)
       }
-      errorDetail = `base64 too short: ${base64.length} chars`
-    } else if (response.text) {
-      errorDetail = `model returned text instead of image: "${response.text.slice(0, 200)}"`
-    } else {
-      errorDetail = `no media and no text in response. finishReason: ${response.finishReason ?? "unknown"}`
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      errors.push(`${model.label}: ${message.slice(0, 200)}`)
+      console.warn(`[genkit] ${model.label} failed: ${message.slice(0, 200)}`)
     }
-
-    console.warn(`[genkit] Imagen returned no image: ${errorDetail}`)
-    return { ...generatePlaceholder(), error: errorDetail }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.warn(`[genkit] Image generation failed: ${message.slice(0, 300)}`)
-    return { ...generatePlaceholder(), error: message }
   }
+
+  const errorDetail = errors.join(" | ")
+  console.warn(`[genkit] All image models failed: ${errorDetail}`)
+  return { ...generatePlaceholder(), error: errorDetail }
 }
 
 // ── Placeholder ──────────────────────────────────────────────────────────────
