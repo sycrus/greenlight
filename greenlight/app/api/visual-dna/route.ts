@@ -10,7 +10,8 @@
  */
 
 import { NextResponse } from "next/server"
-import { callGemini, parseGeminiJson, validateVisualDNA } from "@greenlight/lib/gemini"
+import { callGemini, parseGeminiJson } from "@greenlight/lib/genkit"
+import { validateVisualDNA } from "@greenlight/lib/gemini"
 import { readStageRecord, writeStageRecord } from "@greenlight/lib/firestore"
 import { VISUAL_DNA_SYSTEM_PROMPT } from "@greenlight/lib/prompts/visual-dna"
 import type { Territory, VisualDNA } from "@greenlight/lib/types/pipeline"

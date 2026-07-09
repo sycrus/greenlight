@@ -9,7 +9,8 @@
 
 import { NextResponse } from "next/server"
 import { randomUUID } from "node:crypto"
-import { callGemini, parseGeminiJson, validateParsedBrief } from "@greenlight/lib/gemini"
+import { callGemini, parseGeminiJson } from "@greenlight/lib/genkit"
+import { validateParsedBrief } from "@greenlight/lib/gemini"
 import { writeStageRecord } from "@greenlight/lib/firestore"
 import {
   writeBriefInput,

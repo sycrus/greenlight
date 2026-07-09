@@ -14,10 +14,12 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@genkit-ai/google-genai": "^1.39.0",
     "@google-cloud/aiplatform": "^6.6.0",
     "@google-cloud/storage": "^7.21.0",
     "@google-cloud/vertexai": "^1.12.0",
     "firebase-admin": "^13.0.0",
+    "genkit": "^1.39.0",
     "googleapis": "^173.0.0",
     "next": "^14.2.0",
     "react": "^18.3.0",

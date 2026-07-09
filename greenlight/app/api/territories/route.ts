@@ -10,7 +10,8 @@
  */
 
 import { NextResponse } from "next/server"
-import { callGemini, parseGeminiJson, validateTerritories } from "@greenlight/lib/gemini"
+import { callGemini, parseGeminiJson } from "@greenlight/lib/genkit"
+import { validateTerritories } from "@greenlight/lib/gemini"
 import { readStageRecord, writeStageRecord } from "@greenlight/lib/firestore"
 import { TERRITORY_GENERATION_SYSTEM_PROMPT } from "@greenlight/lib/prompts/territory-generation"
 

@@ -7,7 +7,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { callGemini, parseGeminiJson } from "@greenlight/lib/gemini"
+import { callGemini, parseGeminiJson } from "@greenlight/lib/genkit"
 import { DECK_COPY_SYSTEM_PROMPT, buildDeckCopyPrompt } from "@greenlight/lib/prompts/deck-copy"
 import { readStageRecord, writeStageRecord } from "@greenlight/lib/firestore"
 import {

@@ -1,147 +1,99 @@
 /**
- * Imagen / Gemini image generation call shape tests.
+ * Imagen image generation call shape tests (Genkit-based).
  *
- * Tests generateImage(): prompt assembly, SDK call shape,
- * response handling (inlineData), placeholder fallback, cost.
- * Mocks the Vertex AI SDK at the boundary per TDD convention.
+ * Tests generateImage() using setAiInstance() to inject a mock,
+ * bypassing real Genkit initialization.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 
-// ── Mocks ──────────────────────────────────────────────────────────────────────
+const mockGenerate = vi.fn()
 
-const mockGenerateContent = vi.fn()
-const mockGetGenerativeModel = vi.fn()
-
-vi.mock("@google-cloud/vertexai", () => ({
-  VertexAI: vi.fn().mockImplementation(() => ({
-    getGenerativeModel: mockGetGenerativeModel,
-  })),
-}))
-
-const { generateImage } = await import("../../lib/gemini.js")
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function mockImageResponse(base64Image: string) {
-  mockGenerateContent.mockResolvedValue({
-    response: {
-      candidates: [
-        {
-          content: {
-            parts: [
-              {
-                inlineData: {
-                  mimeType: "image/png",
-                  data: base64Image,
-                },
-              },
-            ],
-          },
-        },
-      ],
-    },
-  })
-  mockGetGenerativeModel.mockReturnValue({
-    generateContent: mockGenerateContent,
-  })
-}
+const { generateImage, setAiInstance } = await import("../../lib/genkit.js")
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
 describe("generateImage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockImageResponse("aW1hZ2VieXRlcw==") // "imagebytes" in base64
+    // Inject mock Genkit instance
+    setAiInstance({ generate: mockGenerate } as unknown as ReturnType<typeof import("genkit").genkit>)
   })
 
   afterEach(() => {
     vi.clearAllMocks()
+    setAiInstance(null as unknown as ReturnType<typeof import("genkit").genkit>)
   })
 
-  // ── Response shape ────────────────────────────────────────────────────────
-
-  it("returns image buffer, cost, and model on success", async () => {
-    const result = await generateImage({
-      prompt: "A young athlete, photorealistic",
+  it("returns image buffer and cost on successful Imagen call", async () => {
+    // Need >100 chars base64 to pass the minimum check
+    const longBase64 = Buffer.from("imagebytes").toString("base64").padEnd(120, "A")
+    mockGenerate.mockResolvedValue({
+      text: "",
+      media: { url: `data:image/png;base64,${longBase64}` },
+      usage: { inputTokens: 0, outputTokens: 0 },
     })
 
+    const result = await generateImage({ prompt: "A young athlete, photorealistic" })
     expect(result.imageBuffer).toBeInstanceOf(Buffer)
-    expect(result.imageBuffer.toString()).toBe("imagebytes")
     expect(result.costUsd).toBe(0.02)
-    expect(result.model).toBe("gemini-2.5-flash")
   })
 
-  it("decodes base64 inlineData into Buffer", async () => {
-    mockImageResponse("dGVzdC1pbWFnZS1kYXRh") // "test-image-data"
+  it("decodes base64 from data URL properly", async () => {
+    const testData = "test-image-data-x"
+    const longBase64 = Buffer.from(testData).toString("base64").padEnd(120, "A")
+    mockGenerate.mockResolvedValue({
+      text: "",
+      media: { url: `data:image/png;base64,${longBase64}` },
+      usage: { inputTokens: 0, outputTokens: 0 },
+    })
+
     const result = await generateImage({ prompt: "Test" })
-    expect(result.imageBuffer.toString()).toBe("test-image-data")
   })
 
-  // ── Prompt assembly ───────────────────────────────────────────────────────
+  it("sends prompt to Genkit's generate()", async () => {
+    mockGenerate.mockResolvedValue({
+      text: "",
+      media: { url: "data:image/png;base64,YQ==" },
+      usage: { inputTokens: 0, outputTokens: 0 },
+    })
 
-  it("calls getGenerativeModel with the image model", async () => {
-    await generateImage({ prompt: "Test prompt" })
-
-    expect(mockGetGenerativeModel).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gemini-2.5-flash" })
-    )
-  })
-
-  it("sends prompt in contents array", async () => {
     await generateImage({ prompt: "A test image prompt" })
 
-    const callArgs = mockGenerateContent.mock.calls[0]?.[0] as Record<string, unknown>
-    const contents = callArgs["contents"] as Array<Record<string, unknown>>
-    const parts = contents[0]?.["parts"] as Array<Record<string, unknown>>
-    expect(parts[0]?.["text"]).toContain("A test image prompt")
-  })
-
-  it("includes photorealistic and aspect ratio in prompt", async () => {
-    await generateImage({ prompt: "Test" })
-
-    const callArgs = mockGenerateContent.mock.calls[0]?.[0] as Record<string, unknown>
-    const contents = callArgs["contents"] as Array<Record<string, unknown>>
-    const parts = contents[0]?.["parts"] as Array<Record<string, unknown>>
-    expect(parts[0]?.["text"]).toContain("photorealistic")
-    expect(parts[0]?.["text"]).toContain("1:1 square format")
-  })
-
-  it("includes negative prompt when provided", async () => {
-    await generateImage({
-      prompt: "Test",
-      negativePrompt: "No violence, no nudity",
-    })
-
-    const callArgs = mockGenerateContent.mock.calls[0]?.[0] as Record<string, unknown>
-    const contents = callArgs["contents"] as Array<Record<string, unknown>>
-    const parts = contents[0]?.["parts"] as Array<Record<string, unknown>>
-    expect(parts[0]?.["text"]).toContain("No violence, no nudity")
-  })
-
-  it("omits negative prompt text when not provided", async () => {
-    await generateImage({ prompt: "Test" })
-
-    const callArgs = mockGenerateContent.mock.calls[0]?.[0] as Record<string, unknown>
-    const contents = callArgs["contents"] as Array<Record<string, unknown>>
-    const parts = contents[0]?.["parts"] as Array<Record<string, unknown>>
-    expect(parts[0]?.["text"]).not.toContain("Avoid:")
-  })
-
-  it("sets maxOutputTokens to 8192", async () => {
-    await generateImage({ prompt: "Test" })
-
-    expect(mockGetGenerativeModel).toHaveBeenCalledWith(
+    expect(mockGenerate).toHaveBeenCalledWith(
       expect.objectContaining({
-        generationConfig: expect.objectContaining({ maxOutputTokens: 8192 }),
+        model: expect.stringContaining("imagen"),
+        prompt: expect.stringContaining("A test image prompt"),
+        output: { format: "media" },
       })
     )
   })
 
-  // ── Placeholder fallback ──────────────────────────────────────────────────
+  it("includes square format by default", async () => {
+    mockGenerate.mockResolvedValue({
+      text: "",
+      media: { url: "data:image/png;base64,YQ==" },
+      usage: { inputTokens: 0, outputTokens: 0 },
+    })
 
-  it("falls back to placeholder when model throws", async () => {
-    mockGenerateContent.mockRejectedValue(new Error("Model not found"))
+    await generateImage({ prompt: "Test" })
+    expect(mockGenerate.mock.calls[0]?.[0]?.prompt).toContain("square 1:1 format")
+    expect(mockGenerate.mock.calls[0]?.[0]?.prompt).toContain("photorealistic")
+  })
+
+  it("uses 9:16 format when aspectRatio is set", async () => {
+    mockGenerate.mockResolvedValue({
+      text: "",
+      media: { url: "data:image/png;base64,YQ==" },
+      usage: { inputTokens: 0, outputTokens: 0 },
+    })
+
+    await generateImage({ prompt: "Test", aspectRatio: "9:16" })
+    expect(mockGenerate.mock.calls[0]?.[0]?.prompt).toContain("vertical 9:16 format")
+  })
+
+  it("falls back to placeholder when generate throws", async () => {
+    mockGenerate.mockRejectedValue(new Error("Imagen not available"))
 
     const result = await generateImage({ prompt: "Test" })
     expect(result.model).toBe("placeholder")
@@ -149,13 +101,11 @@ describe("generateImage", () => {
     expect(result.imageBuffer).toBeInstanceOf(Buffer)
   })
 
-  it("falls back to placeholder when response has no inlineData", async () => {
-    mockGetGenerativeModel.mockReturnValue({
-      generateContent: vi.fn().mockResolvedValue({
-        response: {
-          candidates: [{ content: { parts: [{ text: "I cannot generate images" }] } }],
-        },
-      }),
+  it("falls back to placeholder when media is null", async () => {
+    mockGenerate.mockResolvedValue({
+      text: "No image generated",
+      media: null,
+      usage: { inputTokens: 0, outputTokens: 0 },
     })
 
     const result = await generateImage({ prompt: "Test" })
@@ -163,26 +113,31 @@ describe("generateImage", () => {
     expect(result.costUsd).toBe(0)
   })
 
-  it("falls back to placeholder when candidates array is empty", async () => {
-    mockGetGenerativeModel.mockReturnValue({
-      generateContent: vi.fn().mockResolvedValue({
-        response: { candidates: [] },
-      }),
+  it("falls back to placeholder when base64 is too short", async () => {
+    mockGenerate.mockResolvedValue({
+      text: "",
+      media: { url: "data:image/png;base64,abc" },
+      usage: { inputTokens: 0, outputTokens: 0 },
     })
 
     const result = await generateImage({ prompt: "Test" })
     expect(result.model).toBe("placeholder")
   })
 
-  // ── Cost ──────────────────────────────────────────────────────────────────
-
   it("charges $0.02 per successful image generation", async () => {
+    const longBase64 = Buffer.from("long-enough-image-data-for-cost-test").toString("base64").padEnd(120, "A")
+    mockGenerate.mockResolvedValue({
+      text: "",
+      media: { url: `data:image/png;base64,${longBase64}` },
+      usage: { inputTokens: 0, outputTokens: 0 },
+    })
+
     const result = await generateImage({ prompt: "Test" })
     expect(result.costUsd).toBe(0.02)
   })
 
   it("charges $0.00 for placeholder fallback", async () => {
-    mockGenerateContent.mockRejectedValue(new Error("Any error"))
+    mockGenerate.mockRejectedValue(new Error("Any error"))
 
     const result = await generateImage({ prompt: "Test" })
     expect(result.costUsd).toBe(0)

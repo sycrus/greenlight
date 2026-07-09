@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { generateImage } from "@greenlight/lib/gemini"
+import { generateImage } from "@greenlight/lib/genkit"
 import { uploadToGcs, gcsToHttps } from "@greenlight/lib/gcs"
 import { readStageRecord, writeStageRecord } from "@greenlight/lib/firestore"
 
