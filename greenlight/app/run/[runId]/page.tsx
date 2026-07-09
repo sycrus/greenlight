@@ -530,6 +530,14 @@ export default function RunStatusPage() {
     fetchStatus()
   }, [fetchStatus])
 
+  // Initialize edit brief text from stored raw brief when data loads
+  useEffect(() => {
+    const rawBrief = data?.stages?.brief_parsing?.["_rawBrief"] as string | undefined
+    if (rawBrief && !editBriefText) {
+      setEditBriefText(rawBrief)
+    }
+  }, [data, editBriefText])
+
   // Re-parse brief handler
   async function handleReparseBrief() {
     setReparsingBrief(true)
@@ -692,14 +700,6 @@ export default function RunStatusPage() {
     : false
   const ecdPassed = gatesData?.ecd_approval != null
   const clientPassed = gatesData?.client_approval != null
-
-  // Initialize edit brief text from stored raw brief when data loads
-  useEffect(() => {
-    const rawBrief = stagesData?.brief_parsing?.["_rawBrief"] as string | undefined
-    if (rawBrief && !editBriefText) {
-      setEditBriefText(rawBrief)
-    }
-  }, [stagesData, editBriefText])
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
