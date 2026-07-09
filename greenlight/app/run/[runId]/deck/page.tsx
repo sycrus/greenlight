@@ -70,12 +70,11 @@ interface VisualDnaData {
 
 function imgUrl(uri: string | null | undefined): string | null {
   if (!uri) return null
-  if (uri.startsWith("https://")) return uri
+  if (uri.startsWith("https://") || uri.startsWith("/")) return uri
   if (uri.startsWith("gs://")) {
     const m = uri.match(/^gs:\/\/([^\/]+)\/(.+)$/)
     if (m) return `https://storage.googleapis.com/${m[1]}/${m[2]}`
   }
-  // Data URL fallback (for freshly generated images)
   if (uri.startsWith("data:")) return uri
   return null
 }

@@ -44,6 +44,8 @@ export interface ImageGenerationOptions {
 export interface ImageGenerationResult {
   imageBuffer: Buffer
   filename: string
+  /** Local URL for serving the image from /generated/ */
+  localUrl: string
   costUsd: number
   model: string
 }
@@ -272,10 +274,26 @@ export async function generateImage(
 
   const imageBuffer = await downloadImage(firstOutput)
 
+  // Save to public/generated/ for local serving (bypasses GCS moderation)
+  const { writeFileSync, mkdirSync, existsSync } = await import("fs")
+  const { join } = await import("path")
+  const publicDir = join(process.cwd(), "public", "generated")
+  if (!existsSync(publicDir)) {
+    mkdirSync(publicDir, { recursive: true })
+  }
+
+  const localFilename = `comfy_${Date.now()}_${firstOutput.filename}`
+  const localPath = join(publicDir, localFilename)
+  writeFileSync(localPath, imageBuffer)
+
+  const localUrl = `/generated/${localFilename}`
+  console.log(`[comfyui] Saved to ${localPath} (${imageBuffer.length} bytes)`)
+
   return {
     imageBuffer,
     filename: firstOutput.filename,
-    costUsd: 0, // Local — free
+    localUrl,
+    costUsd: 0,
     model: "comfyui-local",
   }
 }

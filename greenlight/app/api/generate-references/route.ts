@@ -178,20 +178,33 @@ export async function POST(req: Request) {
               aspectRatio: "1:1",
             })
 
-        // Upload to GCS
-        const upload = await uploadToGcs(result.imageBuffer, {
-          runId,
-          ingredientId: ing.ingredient_id,
-        })
+        // Store image — GCS for Gemini, local for ComfyUI
+        let imageUri: string
+        let imageUrl: string
+
+        if (useComfyUI && "localUrl" in result) {
+          // ComfyUI: use local URL, no GCS upload
+          const comfyResult = result as unknown as { localUrl: string }
+          imageUri = comfyResult.localUrl
+          imageUrl = comfyResult.localUrl
+        } else {
+          // Gemini: upload to GCS
+          const upload = await uploadToGcs(result.imageBuffer, {
+            runId,
+            ingredientId: ing.ingredient_id,
+          })
+          imageUri = upload.gcsUri
+          imageUrl = upload.publicUrl
+        }
 
         // Update ingredient in memory
-        ing.generated_reference_uri = upload.gcsUri
+        ing.generated_reference_uri = imageUri
 
         generated.push({
           ingredient_id: ing.ingredient_id,
           type: ing.type,
-          gcsUri: upload.gcsUri,
-          publicUrl: upload.publicUrl,
+          gcsUri: imageUri,
+          publicUrl: imageUrl,
           ...((result as unknown as Record<string, unknown>)["error"] !== undefined && { imageError: (result as unknown as Record<string, unknown>)["error"] as string }),
         })
 
