@@ -167,19 +167,28 @@ export async function submitPrompt(
     workflow = buildDefaultWorkflow(options)
   }
 
+  const body = JSON.stringify({ prompt: workflow })
+  console.log(`[comfyui] Submitting to ${COMFY_URL}/prompt`)
+  console.log(`[comfyui] Workflow: ${options.workflow ?? "built-in SDXL"}`)
+  console.log(`[comfyui] Prompt: ${options.prompt.slice(0, 300)}${options.prompt.length > 300 ? "..." : ""}`)
+  if (options.negativePrompt) {
+    console.log(`[comfyui] Negative: ${options.negativePrompt.slice(0, 150)}`)
+  }
+
   const res = await fetch(`${COMFY_URL}/prompt`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: workflow }),
+    body,
   })
 
   if (!res.ok) {
     const text = await res.text()
+    console.error(`[comfyui] Submit failed (${res.status}): ${text.slice(0, 300)}`)
     throw new Error(`ComfyUI prompt failed (${res.status}): ${text.slice(0, 200)}`)
   }
 
   const data = (await res.json()) as ComfyPromptResult
-  console.log(`[comfyui] Prompt submitted: ${data.prompt_id}`)
+  console.log(`[comfyui] Accepted — prompt_id: ${data.prompt_id}`)
   return data
 }
 
