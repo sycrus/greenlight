@@ -7,3 +7,6 @@ dist/
 coverage/
 
 .vercel
+sa-key.json
+*client_secret*.json
+*.apps.googleusercontent.com.json
