@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 
 interface BriefResult {
   parsed_brief: {
@@ -139,9 +140,22 @@ export default function HomePage() {
             </div>
           )}
           <p className="text-xs text-zinc-500">
-            Run ID: {result.runId} &middot; Confidence:{" "}
+            Run ID:{" "}
+            <Link
+              href={`/run/${result.runId}`}
+              className="text-blue-400 hover:text-blue-300 underline"
+            >
+              {result.runId}
+            </Link>{" "}
+            &middot; Confidence:{" "}
             {(result.parsed_brief.confidence_score * 100).toFixed(0)}%
           </p>
+          <Link
+            href={`/run/${result.runId}`}
+            className="mt-3 inline-block rounded-lg bg-zinc-100 px-5 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200 transition-colors"
+          >
+            View Pipeline →
+          </Link>
         </div>
       )}
     </main>

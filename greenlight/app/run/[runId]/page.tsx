@@ -503,6 +503,8 @@ export default function RunStatusPage() {
   const [data, setData] = useState<RunStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [generatingTerritories, setGeneratingTerritories] = useState(false)
+  const [generatingVisualDna, setGeneratingVisualDna] = useState(false)
   const [generatingDeck, setGeneratingDeck] = useState(false)
 
   const fetchStatus = useCallback(async () => {
@@ -524,6 +526,52 @@ export default function RunStatusPage() {
   useEffect(() => {
     fetchStatus()
   }, [fetchStatus])
+
+  // Generate Territories handler
+  async function handleGenerateTerritories() {
+    setGeneratingTerritories(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/territories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? "Territory generation failed")
+      await fetchStatus()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Territory generation failed")
+    } finally {
+      setGeneratingTerritories(false)
+    }
+  }
+
+  // Encode Visual DNA handler — calls API once per territory
+  async function handleGenerateVisualDna() {
+    setGeneratingVisualDna(true)
+    setError(null)
+    try {
+      const territoriesData = data?.stages?.territory_generation?.["territories"] as TerritoryData[] | undefined
+      if (!territoriesData || territoriesData.length === 0) {
+        throw new Error("No territories found — run Stage 2 first")
+      }
+      for (const territory of territoriesData) {
+        const res = await fetch("/api/visual-dna", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ runId, territory }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error ?? `Visual DNA failed for ${territory.id}`)
+      }
+      await fetchStatus()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Visual DNA encoding failed")
+    } finally {
+      setGeneratingVisualDna(false)
+    }
+  }
 
   // Generate Deck handler
   async function handleGenerateDeck() {
@@ -667,7 +715,63 @@ export default function RunStatusPage() {
         </div>
       </section>
 
-      {/* Deck Generation: button + links */}
+      {/* Pipeline triggers — buttons to advance each stage */}
+
+      {/* Stage 2 trigger: Generate Territories */}
+      {stagesData && stageStatus(stagesData["brief_parsing"]) === "complete" &&
+        stageStatus(stagesData["territory_generation"]) === "pending" && (
+        <section className="mb-8">
+          <div className="rounded-lg border border-zinc-700 bg-zinc-900/50 px-4 py-4">
+            <p className="text-sm text-zinc-300 mb-3">
+              Brief parsed. Generate 3 creative territories to explore.
+            </p>
+            <button
+              type="button"
+              onClick={handleGenerateTerritories}
+              disabled={generatingTerritories}
+              className="rounded-lg bg-zinc-100 px-6 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {generatingTerritories ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 border-2 border-zinc-600 border-t-transparent rounded-full animate-spin" />
+                  Generating Territories…
+                </span>
+              ) : (
+                "🎨 Generate Territories"
+              )}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Stage 3 trigger: Encode Visual DNA */}
+      {stagesData && stageStatus(stagesData["territory_generation"]) === "complete" &&
+        stageStatus(stagesData["visual_dna"]) === "pending" && (
+        <section className="mb-8">
+          <div className="rounded-lg border border-zinc-700 bg-zinc-900/50 px-4 py-4">
+            <p className="text-sm text-zinc-300 mb-3">
+              3 territories generated. Encode Visual DNA for each territory (calls Gemini once per territory — 3 calls).
+            </p>
+            <button
+              type="button"
+              onClick={handleGenerateVisualDna}
+              disabled={generatingVisualDna}
+              className="rounded-lg bg-zinc-100 px-6 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {generatingVisualDna ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 border-2 border-zinc-600 border-t-transparent rounded-full animate-spin" />
+                  Encoding Visual DNA…
+                </span>
+              ) : (
+                "🧬 Encode Visual DNA"
+              )}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Stage 4 trigger: Generate Deck — button + links */}
       {stagesData && stageStatus(stagesData["brief_parsing"]) === "complete" &&
         stageStatus(stagesData["territory_generation"]) === "complete" &&
         stageStatus(stagesData["visual_dna"]) === "complete" && (
