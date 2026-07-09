@@ -48,6 +48,7 @@ interface IngredientData {
   ingredient_id: string
   type: string
   description: string
+  reference_image_uri: string | null
   generated_reference_uri: string | null
   flow_ingredient_prompt: string
 }
@@ -67,14 +68,20 @@ interface VisualDnaData {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function imgUrl(uri: string | null): string | null {
+function imgUrl(uri: string | null | undefined): string | null {
   if (!uri) return null
   if (uri.startsWith("https://")) return uri
   if (uri.startsWith("gs://")) {
     const m = uri.match(/^gs:\/\/([^\/]+)\/(.+)$/)
     if (m) return `https://storage.googleapis.com/${m[1]}/${m[2]}`
   }
-  return uri
+  // Data URL fallback (for freshly generated images)
+  if (uri.startsWith("data:")) return uri
+  return null
+}
+
+function ingredientImage(ing: IngredientData): string | null {
+  return ingredientImage(ing) ?? imgUrl(ing.reference_image_uri)
 }
 
 // ── Slide Components ───────────────────────────────────────────────────────────
@@ -185,7 +192,7 @@ function TerritoryVisualSlide({ territory, vd }: { territory: DeckCopyData["terr
                   <div key={ing.ingredient_id} style={{ maxWidth: 240 }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={imgUrl(ing.generated_reference_uri)!}
+                      src={ingredientImage(ing)!}
                       alt={ing.description}
                       style={{ width: "100%", borderRadius: 8, border: "1px solid #333" }}
                     />
