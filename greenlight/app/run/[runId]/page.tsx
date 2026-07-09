@@ -322,6 +322,7 @@ function VisualDNAPanel({
 }) {
   const [generating, setGenerating] = useState<string | null>(null)
   const [genError, setGenError] = useState<string | null>(null)
+  const [imageSource, setImageSource] = useState<"gemini" | "comfyui">("gemini")
 
   async function handleGenerate(ingredientId: string) {
     setGenerating(ingredientId)
@@ -330,7 +331,7 @@ function VisualDNAPanel({
       const res = await fetch("/api/generate-references", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runId, territoryId, ingredientIds: [ingredientId] }),
+        body: JSON.stringify({ runId, territoryId, ingredientIds: [ingredientId], source: imageSource }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Generation failed")
@@ -407,9 +408,19 @@ function VisualDNAPanel({
 
       {/* Ingredients */}
       <div>
-        <h4 className="text-xs font-semibold text-zinc-400 mb-1.5">
-          Ingredients ({vd.ingredients.length})
-        </h4>
+        <div className="flex items-center justify-between mb-1.5">
+          <h4 className="text-xs font-semibold text-zinc-400">
+            Ingredients ({vd.ingredients.length})
+          </h4>
+          <select
+            value={imageSource}
+            onChange={(e) => setImageSource(e.target.value as "gemini" | "comfyui")}
+            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-400 focus:outline-none"
+          >
+            <option value="gemini">Gemini</option>
+            <option value="comfyui">ComfyUI</option>
+          </select>
+        </div>
         {genError && (
           <div className="mb-2 rounded border border-red-800 bg-red-950/30 px-3 py-1.5 text-xs text-red-400">
             {genError}

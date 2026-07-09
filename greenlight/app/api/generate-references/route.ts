@@ -11,6 +11,7 @@
 
 import { NextResponse } from "next/server"
 import { generateImage } from "@greenlight/lib/genkit"
+import { generateImage as generateComfyImage } from "@greenlight/lib/comfyui"
 import { uploadToGcs, gcsToHttps } from "@greenlight/lib/gcs"
 import { readStageRecord, writeStageRecord } from "@greenlight/lib/firestore"
 
@@ -48,11 +49,14 @@ interface ErrorResult {
 
 export async function POST(req: Request) {
   try {
-    const { runId, territoryId, ingredientIds } = (await req.json()) as {
+    const { runId, territoryId, ingredientIds, source } = (await req.json()) as {
       runId?: string
       territoryId?: string
       ingredientIds?: string[]
+      source?: "gemini" | "comfyui"
     }
+
+    const useComfyUI = source === "comfyui"
 
     if (!runId?.trim() || !territoryId?.trim()) {
       return NextResponse.json(
@@ -133,12 +137,19 @@ export async function POST(req: Request) {
           ? (vd["negative_prompt_list"] as string[]).join(", ")
           : undefined
 
-        // Call Imagen 3
-        const result = await generateImage({
-          prompt,
-          ...(negativePrompt !== undefined && { negativePrompt }),
-          aspectRatio: "1:1",
-        })
+        // Generate image — Gemini or ComfyUI
+        const result = useComfyUI
+          ? await generateComfyImage({
+              prompt,
+              ...(negativePrompt !== undefined && { negativePrompt }),
+              width: 1024,
+              height: 1024,
+            })
+          : await generateImage({
+              prompt,
+              ...(negativePrompt !== undefined && { negativePrompt }),
+              aspectRatio: "1:1",
+            })
 
         // Upload to GCS
         const upload = await uploadToGcs(result.imageBuffer, {
@@ -154,7 +165,7 @@ export async function POST(req: Request) {
           type: ing.type,
           gcsUri: upload.gcsUri,
           publicUrl: upload.publicUrl,
-          ...(result.error !== undefined && { imageError: result.error }),
+          ...((result as unknown as Record<string, unknown>)["error"] !== undefined && { imageError: (result as unknown as Record<string, unknown>)["error"] as string }),
         })
 
         totalCost += result.costUsd
