@@ -32,7 +32,18 @@ function driveClient(): drive_v3.Drive {
 }
 
 function getAuth() {
-  // Use service account key file — official pattern for Slides/Drive APIs
+  // Use OAuth2 with refresh token — creates files in your personal Google Drive
+  const clientId = process.env["OAUTH_CLIENT_ID"]
+  const clientSecret = process.env["OAUTH_CLIENT_SECRET"]
+  const refreshToken = process.env["OAUTH_REFRESH_TOKEN"]
+
+  if (clientId && clientSecret && refreshToken) {
+    const oauth2 = new google.auth.OAuth2(clientId, clientSecret)
+    oauth2.setCredentials({ refresh_token: refreshToken })
+    return oauth2
+  }
+
+  // Fallback to service account (won't work for Drive/Slides in personal projects)
   const keyFile = "./sa-key.json"
   return new google.auth.GoogleAuth({
     keyFile,
