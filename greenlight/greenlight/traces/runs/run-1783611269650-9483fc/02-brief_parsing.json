@@ -1,0 +1,45 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783611269650-9483fc",
+    "writtenAt": "2026-07-09T15:34:41.219Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "vertexai/gemini-2.5-flash",
+    "confidenceScore": 0.8,
+    "inputTokens": 834,
+    "outputTokens": 383,
+    "costUsd": 0.000044362499999999994
+  },
+  "brand": "Patagonia",
+  "campaign_objective": "promote its Worn Wear repair and resale program",
+  "target_audience": {
+    "primary": "environmentally conscious 25–40 year-olds who value sustainability over fast fashion",
+    "secondary": null
+  },
+  "key_message": "The most sustainable jacket is the one you already own.",
+  "mandatory_elements": [
+    "Patagonia logo",
+    "Worn Wear patch",
+    "The most sustainable jacket is the one you already own. (as tagline)"
+  ],
+  "tone_descriptors": [
+    "honest",
+    "warm",
+    "activist-lite",
+    "authentic",
+    "documentary-style"
+  ],
+  "format": {
+    "duration_seconds": 30,
+    "aspect_ratio": "16:9",
+    "platform": "Instagram, YouTube"
+  },
+  "brief_gaps": [
+    "Desired video duration (45 seconds) conflicts with schema's mandated 30 seconds. Outputting 30s as per schema.",
+    "Specific aspect ratio for Instagram/YouTube platforms not explicitly stated. Inferred 16:9 as default, but 9:16 (for Reels/Shorts) may be more appropriate for short-form video on these platforms.",
+    "Specific Instagram/YouTube format (e.g., Reels, Shorts, standard feed video) not specified.",
+    "No explicit call to action provided.",
+    "No brand-specific palette or typography guidance provided in the brief content itself."
+  ],
+  "confidence_score": 0.8
+}
