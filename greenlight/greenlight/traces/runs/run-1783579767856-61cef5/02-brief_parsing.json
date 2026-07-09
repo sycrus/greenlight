@@ -1,0 +1,46 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783579767856-61cef5",
+    "writtenAt": "2026-07-09T06:49:38.605Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "gemini-2.5-flash",
+    "confidenceScore": 0.85,
+    "inputTokens": 804,
+    "outputTokens": 334,
+    "costUsd": 0.000040125
+  },
+  "brand": "Nike",
+  "campaign_objective": "Launch the Nike Air Max Dn to Gen Z, highlighting its new Dynamic Air technology.",
+  "target_audience": {
+    "primary": "Gen Z (18–24), sneaker culture, streetwear adjacent",
+    "secondary": null
+  },
+  "key_message": "Feel the Unreal.",
+  "mandatory_elements": [
+    "Nike swoosh",
+    "Nike Air Max Dn shoe (volt green and total orange colorways)",
+    "visible Air unit in every shot",
+    "No competitor footwear"
+  ],
+  "tone_descriptors": [
+    "raw",
+    "real",
+    "authentic",
+    "energetic",
+    "unpolished"
+  ],
+  "format": {
+    "duration_seconds": 30,
+    "aspect_ratio": "9:16",
+    "platform": "TikTok"
+  },
+  "brief_gaps": [
+    "Specific call to action not provided.",
+    "Specific music/audio requirements not provided.",
+    "Talent guidelines or specific demographic representation within the 18-24 range not provided.",
+    "Further details on the visual aesthetic beyond 'raw and real' (e.g., lighting, common settings) not provided.",
+    "Confirmation on whether 'Feel the Unreal' should be visually or audibly presented in the video."
+  ],
+  "confidence_score": 0.85
+}
