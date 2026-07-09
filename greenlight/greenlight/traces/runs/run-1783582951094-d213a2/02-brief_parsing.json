@@ -1,0 +1,45 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783582951094-d213a2",
+    "writtenAt": "2026-07-09T07:42:41.403Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "vertexai/gemini-2.5-flash",
+    "confidenceScore": 0.85,
+    "inputTokens": 815,
+    "outputTokens": 319,
+    "costUsd": 0.000039206249999999994
+  },
+  "brand": "Nike",
+  "campaign_objective": "Launch the Nike Air Max Dn to Gen Z",
+  "target_audience": {
+    "primary": "Gen Z, 18-24, sneaker culture, streetwear adjacent",
+    "secondary": null
+  },
+  "key_message": "Feel the Unreal.",
+  "mandatory_elements": [
+    "Nike Air Max Dn shoe (volt green and total orange colorways)",
+    "visible Air unit in every shot",
+    "Nike swoosh visible in first and last 3 seconds",
+    "No competitor footwear"
+  ],
+  "tone_descriptors": [
+    "raw",
+    "real",
+    "unpolished",
+    "authentic"
+  ],
+  "format": {
+    "duration_seconds": 30,
+    "aspect_ratio": "9:16",
+    "platform": "TikTok"
+  },
+  "brief_gaps": [
+    "Specific call to action not provided.",
+    "Desired musical style or sound design not specified.",
+    "No specific creative concepts or narrative direction provided beyond tone and product features.",
+    "Influencer strategy or specific talent not specified.",
+    "How 'Dynamic Air' (four tubes shifting pressure) should be visually communicated beyond 'visible Air unit in every shot' is not detailed."
+  ],
+  "confidence_score": 0.85
+}
