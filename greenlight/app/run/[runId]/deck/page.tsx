@@ -256,19 +256,18 @@ export default function DeckPage() {
         setDeckCopy(deck)
         setBrand((data.stages?.brief_parsing?.brand as string) ?? "Unknown")
 
-        // Load Visual DNA territories for images
-        const vdData = data.stages?.visual_dna?.territories as Record<string, VisualDnaData> | undefined
-        if (vdData) {
-          setVisualDnas(vdData)
-          // Debug: log image URIs
-          for (const [tid, vd] of Object.entries(vdData)) {
-            const ings = (vd as VisualDnaData).ingredients ?? []
-            for (const ing of ings) {
-              console.log(`[deck] ${tid}/${ing.ingredient_id}: gen=${ing.generated_reference_uri?.slice(0, 60)} ref=${ing.reference_image_uri?.slice(0, 60)}`)
-            }
-          }
-        } else {
-          console.warn("[deck] No visual_dna.territories found in API response")
+        // Load Visual DNA territories for images.
+        // Map territory_ids (e.g. "territory-1") to deck copy keys (e.g. "t1")
+        const vdRaw = data.stages?.visual_dna?.territories as Record<string, VisualDnaData> | undefined
+        if (vdRaw) {
+          // Build a lookup by index: territory-1 → t1, territory-2 → t2, territory-3 → t3
+          const entries = Object.entries(vdRaw)
+          const mapped: Record<string, VisualDnaData> = {}
+          entries.forEach(([key, vd], i) => {
+            mapped[`t${i + 1}`] = vd as VisualDnaData
+            mapped[key] = vd as VisualDnaData // also keep original key
+          })
+          setVisualDnas(mapped)
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load deck")
