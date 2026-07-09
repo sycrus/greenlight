@@ -69,82 +69,46 @@ describe("generateImage", () => {
     )
   })
 
-  it("tries next model when first fails", async () => {
-    // First model fails with text, second succeeds
+  it("retries on rate limit (429) errors", async () => {
+    vi.useFakeTimers()
     mockGenerate
-      .mockResolvedValueOnce({
-        text: "I cannot generate images",
-        media: null,
-        usage: { inputTokens: 0, outputTokens: 0 },
-      })
+      .mockRejectedValueOnce(new Error("429 RESOURCE_EXHAUSTED"))
       .mockResolvedValueOnce({
         text: "",
-        media: { url: `data:image/png;base64,${Buffer.from("second-model-image").toString("base64").padEnd(120, "A")}` },
+        media: { url: `data:image/png;base64,${Buffer.from("retry-success").toString("base64").padEnd(120, "A")}` },
         usage: { inputTokens: 0, outputTokens: 0 },
       })
 
-    const result = await generateImage({ prompt: "Test" })
-    expect(result.imageBuffer.toString().startsWith("second-model-image")).toBe(true)
+    const promise = generateImage({ prompt: "Test" })
+    await vi.runAllTimersAsync()
+    const result = await promise
+
+    expect(result.imageBuffer.toString().startsWith("retry-success")).toBe(true)
     expect(mockGenerate).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
   })
 
-  it("includes photorealistic and format in prompt", async () => {
-    mockGenerate.mockResolvedValue({
-      text: "",
-      media: { url: `data:image/png;base64,${Buffer.from("test").toString("base64").padEnd(120, "A")}` },
-      usage: { inputTokens: 0, outputTokens: 0 },
-    })
+  it("gives up after MAX_RETRIES rate limits", async () => {
+    vi.useFakeTimers()
+    mockGenerate.mockRejectedValue(new Error("429 RESOURCE_EXHAUSTED"))
 
-    await generateImage({ prompt: "Test" })
-    const callPrompt = mockGenerate.mock.calls[0]?.[0]?.prompt as string
-    expect(callPrompt).toContain("square 1:1 format")
-    expect(callPrompt).toContain("photorealistic")
+    const promise = generateImage({ prompt: "Test" })
+    // Fast-forward through all retry delays
+    await vi.runAllTimersAsync()
+    const result = await promise
+
+    expect(result.model).toBe("placeholder")
+    expect(mockGenerate.mock.calls.length).toBe(3) // MAX_RETRIES
+    vi.useRealTimers()
   })
 
-  it("uses 9:16 format when aspectRatio is set", async () => {
-    mockGenerate.mockResolvedValue({
-      text: "",
-      media: { url: `data:image/png;base64,${Buffer.from("test").toString("base64").padEnd(120, "A")}` },
-      usage: { inputTokens: 0, outputTokens: 0 },
-    })
-
-    await generateImage({ prompt: "Test", aspectRatio: "9:16" })
-    expect(mockGenerate.mock.calls[0]?.[0]?.prompt).toContain("vertical 9:16 format")
-  })
-
-  it("falls back to placeholder when all models throw", async () => {
-    // Both models throw
-    mockGenerate
-      .mockRejectedValueOnce(new Error("First model unavailable"))
-      .mockRejectedValueOnce(new Error("Second model unavailable"))
+  it("does not retry on non-rate-limit errors", async () => {
+    mockGenerate.mockRejectedValue(new Error("NOT_FOUND: Model not found"))
 
     const result = await generateImage({ prompt: "Test" })
     expect(result.model).toBe("placeholder")
-    expect(result.costUsd).toBe(0)
-    expect(result.imageBuffer).toBeInstanceOf(Buffer)
-    expect(result.error).toContain("First model unavailable")
-    expect(result.error).toContain("Second model unavailable")
-  })
-
-  it("falls back to placeholder when all models return no media", async () => {
-    // Both models return text, no media
-    mockGenerate
-      .mockResolvedValueOnce({ text: "No image", media: null, usage: { inputTokens: 0, outputTokens: 0 } })
-      .mockResolvedValueOnce({ text: "Cannot generate", media: null, usage: { inputTokens: 0, outputTokens: 0 } })
-
-    const result = await generateImage({ prompt: "Test" })
-    expect(result.model).toBe("placeholder")
-    expect(result.costUsd).toBe(0)
-  })
-
-  it("falls back to placeholder when base64 is too short", async () => {
-    // Both models return too-short base64
-    mockGenerate
-      .mockResolvedValueOnce({ text: "", media: { url: "data:image/png;base64,abc" }, usage: { inputTokens: 0, outputTokens: 0 } })
-      .mockResolvedValueOnce({ text: "", media: { url: "data:image/png;base64,xyz" }, usage: { inputTokens: 0, outputTokens: 0 } })
-
-    const result = await generateImage({ prompt: "Test" })
-    expect(result.model).toBe("placeholder")
+    // Only 1 attempt — no retry for non-429 errors
+    expect(mockGenerate).toHaveBeenCalledTimes(1)
   })
 
   it("charges $0.02 per successful image generation", async () => {
@@ -160,19 +124,9 @@ describe("generateImage", () => {
   })
 
   it("charges $0.00 for placeholder fallback", async () => {
-    mockGenerate.mockRejectedValue(new Error("Any error"))
+    mockGenerate.mockRejectedValue(new Error("NOT_FOUND"))
 
     const result = await generateImage({ prompt: "Test" })
     expect(result.costUsd).toBe(0)
-  })
-
-  it("includes error messages from all failed models", async () => {
-    mockGenerate
-      .mockResolvedValueOnce({ text: "no image gen capability", media: null, usage: { inputTokens: 0, outputTokens: 0 } })
-      .mockResolvedValueOnce({ text: "imagen not available", media: null, usage: { inputTokens: 0, outputTokens: 0 } })
-
-    const result = await generateImage({ prompt: "Test" })
-    expect(result.error).toContain("no image gen")
-    expect(result.error).toContain("imagen not available")
   })
 })

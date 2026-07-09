@@ -159,15 +159,16 @@ export function parseGeminiJson(text: string): unknown | null {
   catch { return null }
 }
 
-// ── Image generation (Imagen + Gemini image models) ─────────────────────────
+// ── Image generation (Gemini 2.5 Flash Image via Vertex AI) ──────────────────
 
+const IMAGE_MODEL = "vertexai/gemini-2.5-flash-image"
 const IMAGEN_COST_PER_IMAGE = 0.02
+const MAX_RETRIES = 3
+const RETRY_DELAY_MS = 2000
 
-// Models to try in order: Gemini image (Vertex AI, no API key needed) → Imagen (Google AI, needs API key)
-const IMAGE_MODELS = [
-  { ref: "vertexai/gemini-2.5-flash-image", label: "Gemini 2.5 Flash Image (Vertex AI)" },
-  { ref: "googleai/imagen-4.0-fast-generate-001", label: "Imagen 4 Fast (Google AI)" },
-]
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 export async function generateImage(
   options: ImageGenerationOptions
@@ -179,13 +180,13 @@ export async function generateImage(
     "high quality, professional",
   ].join(". ")
 
-  const errors: string[] = []
+  let lastError = ""
 
-  for (const model of IMAGE_MODELS) {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[genkit] Trying image model: ${model.label}`)
+      console.log(`[genkit] Image generation attempt ${attempt}/${MAX_RETRIES}`)
       const response = await ai().generate({
-        model: model.ref,
+        model: IMAGE_MODEL,
         prompt,
       })
 
@@ -193,29 +194,39 @@ export async function generateImage(
       if (media?.url) {
         const base64 = media.url.replace(/^data:image\/\w+;base64,/, "")
         if (base64 && base64.length > 100) {
-          console.log(`[genkit] ${model.label} succeeded (${base64.length} chars base64)`)
+          console.log(`[genkit] Image generated (${(base64.length / 1024).toFixed(0)}KB base64)`)
           return {
             imageBuffer: Buffer.from(base64, "base64"),
             costUsd: IMAGEN_COST_PER_IMAGE,
-            model: model.ref,
+            model: IMAGE_MODEL,
           }
         }
-        errors.push(`${model.label}: base64 too short (${base64.length} chars)`)
+        lastError = `base64 too short (${base64.length} chars)`
       } else if (response.text) {
-        errors.push(`${model.label}: returned text, not image — "${response.text.slice(0, 100)}"`)
+        lastError = `returned text, not image: "${response.text.slice(0, 100)}"`
       } else {
-        errors.push(`${model.label}: no media or text — finishReason: ${response.finishReason ?? "unknown"}`)
+        lastError = `no output — finishReason: ${response.finishReason ?? "unknown"}`
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      errors.push(`${model.label}: ${message.slice(0, 200)}`)
-      console.warn(`[genkit] ${model.label} failed: ${message.slice(0, 200)}`)
+      lastError = message.slice(0, 300)
+
+      // Rate limit (429) — retry with backoff
+      if (message.includes("429") || message.includes("RESOURCE_EXHAUSTED")) {
+        const delay = RETRY_DELAY_MS * attempt
+        console.warn(`[genkit] Rate limited, retrying in ${delay / 1000}s...`)
+        await sleep(delay)
+        continue
+      }
+
+      // Other errors — don't retry
+      console.warn(`[genkit] Image generation error: ${message.slice(0, 200)}`)
+      break
     }
   }
 
-  const errorDetail = errors.join(" | ")
-  console.warn(`[genkit] All image models failed: ${errorDetail}`)
-  return { ...generatePlaceholder(), error: errorDetail }
+  console.warn(`[genkit] Image generation failed after ${MAX_RETRIES} attempts: ${lastError}`)
+  return { ...generatePlaceholder(), error: lastError }
 }
 
 // ── Placeholder ──────────────────────────────────────────────────────────────
