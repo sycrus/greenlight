@@ -1,0 +1,45 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783676072406-61d694",
+    "writtenAt": "2026-07-10T09:34:42.252Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "vertexai/gemini-2.5-flash",
+    "confidenceScore": 0.85,
+    "inputTokens": 810,
+    "outputTokens": 324,
+    "costUsd": 0.0000394875
+  },
+  "brand": "Nike",
+  "campaign_objective": "Launch the Nike Air Max Dn, highlighting Dynamic Air technology",
+  "target_audience": {
+    "primary": "Gen Z (18-24, sneaker culture, streetwear adjacent)",
+    "secondary": null
+  },
+  "key_message": "Feel the Unreal.",
+  "mandatory_elements": [
+    "brand logo",
+    "brand tagline",
+    "visible Air unit in every shot",
+    "Nike Air Max Dn in volt green and total orange colorways",
+    "Nike swoosh visible in first and last 3 seconds",
+    "No competitor footwear"
+  ],
+  "tone_descriptors": [
+    "raw",
+    "real",
+    "unpolished"
+  ],
+  "format": {
+    "duration_seconds": 30,
+    "aspect_ratio": "9:16",
+    "platform": "TikTok"
+  },
+  "brief_gaps": [
+    "Specific call to action (e.g., 'Shop now', 'Learn more')",
+    "Guidance on visual style to achieve 'raw and real' aesthetic (e.g., UGC, street shoot, editing style)",
+    "Music/audio strategy (e.g., specific genre, trending TikTok sound, original score)",
+    "Specific talent or influencer requirements"
+  ],
+  "confidence_score": 0.85
+}
