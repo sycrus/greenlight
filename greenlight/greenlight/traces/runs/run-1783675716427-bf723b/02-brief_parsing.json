@@ -1,0 +1,44 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783675716427-bf723b",
+    "writtenAt": "2026-07-10T09:28:46.170Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "vertexai/gemini-2.5-flash",
+    "confidenceScore": 0.88,
+    "inputTokens": 815,
+    "outputTokens": 283,
+    "costUsd": 0.000036506249999999996
+  },
+  "brand": "Nike",
+  "campaign_objective": "Launch the Nike Air Max Dn to Gen Z",
+  "target_audience": {
+    "primary": "Gen Z (18-24), sneaker culture, streetwear adjacent",
+    "secondary": null
+  },
+  "key_message": "Feel the Unreal.",
+  "mandatory_elements": [
+    "visible Air unit in every shot",
+    "Nike swoosh",
+    "No competitor footwear"
+  ],
+  "tone_descriptors": [
+    "raw",
+    "real",
+    "authentic",
+    "energetic",
+    "unpolished"
+  ],
+  "format": {
+    "duration_seconds": 30,
+    "aspect_ratio": "9:16",
+    "platform": "TikTok"
+  },
+  "brief_gaps": [
+    "Call to action (CTA) not specified",
+    "Specific music style or audio trends for TikTok not provided",
+    "Specific narrative or creative concept for the 'raw and real' aesthetic is undefined",
+    "Direction on whether to showcase both volt green and total orange colorways, or prioritize one"
+  ],
+  "confidence_score": 0.88
+}
