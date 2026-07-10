@@ -1,0 +1,39 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783691357698-ec5aac",
+    "writtenAt": "2026-07-10T13:49:20.387Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "deepseek-chat",
+    "confidenceScore": 0.5,
+    "inputTokens": 800,
+    "outputTokens": 221,
+    "costUsd": 0.00045910000000000005
+  },
+  "brand": "Patagonia",
+  "campaign_objective": "Promote the Worn Wear repair and resale program to drive awareness and engagement with sustainability-focused consumers",
+  "target_audience": {
+    "primary": "Environmentally conscious 25–40 year-olds who value sustainability over fast fashion",
+    "secondary": null
+  },
+  "key_message": "The most sustainable jacket is the one you already own.",
+  "mandatory_elements": [
+    "Patagonia logo",
+    "Worn Wear patch"
+  ],
+  "tone_descriptors": [
+    "honest",
+    "warm",
+    "activist-lite"
+  ],
+  "format": {
+    "duration_seconds": 45,
+    "aspect_ratio": "9:16",
+    "platform": "Instagram and YouTube"
+  },
+  "brief_gaps": [
+    "Target platform aspect ratio inferred as 9:16 (Instagram/YouTube Shorts) but not explicitly stated",
+    "No call-to-action specified",
+    "No specific visual style or color palette guidance beyond documentary-style"
+  ]
+}
