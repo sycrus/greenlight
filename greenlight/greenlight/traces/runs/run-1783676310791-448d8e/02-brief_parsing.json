@@ -1,0 +1,46 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783676310791-448d8e",
+    "writtenAt": "2026-07-10T09:38:41.042Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "vertexai/gemini-2.5-flash",
+    "confidenceScore": 0.85,
+    "inputTokens": 810,
+    "outputTokens": 339,
+    "costUsd": 0.0000406125
+  },
+  "brand": "Nike",
+  "campaign_objective": "Launch the Nike Air Max Dn to Gen Z with a TikTok-first campaign that feels raw and real, not polished, highlighting its Dynamic Air technology.",
+  "target_audience": {
+    "primary": "Gen Z, aged 18-24, interested in sneaker culture and streetwear.",
+    "secondary": null
+  },
+  "key_message": "Feel the Unreal.",
+  "mandatory_elements": [
+    "visible Air unit in every shot",
+    "No competitor footwear",
+    "Nike swoosh visible in first and last 3 seconds",
+    "Product shot of Nike Air Max Dn in volt green and total orange colorways"
+  ],
+  "tone_descriptors": [
+    "raw",
+    "real",
+    "unpolished",
+    "authentic",
+    "energetic"
+  ],
+  "format": {
+    "duration_seconds": 30,
+    "aspect_ratio": "9:16",
+    "platform": "TikTok"
+  },
+  "brief_gaps": [
+    "Specific call to action (CTA) for the video",
+    "Guidance on music style or audio trends to leverage on TikTok",
+    "Specific visual examples or creative references for 'raw and real' aesthetic",
+    "Details on specific product benefits beyond 'Dynamic Air'",
+    "Brand tagline (if different from key message)"
+  ],
+  "confidence_score": 0.85
+}
