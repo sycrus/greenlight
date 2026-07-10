@@ -5,7 +5,7 @@
 | Model | vertexai/gemini-2.5-flash |
 | Duration | 11.6s |
 | Input tokens | 847 |
-| Output tokens | 311 |
+| Output tokens | 302 |
 | Cost | $0.00004 |
 
 ## Verification
@@ -13,7 +13,7 @@
 | Check |
 |---|
 | ✅ schema valid |
-| ✅ confidence ≥ 0.5 — confidence: 0.88 |
+| ✅ confidence ≥ 0.5 — confidence: 0.85 |
 | ✅ brief_gaps populated |
 
 ## System prompt
@@ -78,28 +78,27 @@ Launch Oatly's new Barista Edition oat milk in Singapore. Target: 22–35 urban 
   "key_message": "It's just oat milk. But better. Way better.",
   "mandatory_elements": [
     "Oatly logo",
-    "the phrase 'Post Milk Generation'",
-    "Oatly Barista Edition carton in a real café setting",
-    "barista pouring latte art",
-    "customer reaction"
+    "carton of Oatly Barista Edition",
+    "phrase 'Post Milk Generation'"
   ],
   "tone_descriptors": [
     "weird-confident",
     "self-aware",
-    "absurd"
+    "absurd",
+    "not corny"
   ],
   "format": {
-    "duration_seconds": 30,
+    "duration_seconds": 15,
     "aspect_ratio": "9:16",
-    "platform": "TikTok"
+    "platform": "TikTok, Instagram Reels"
   },
   "brief_gaps": [
-    "Specific Call to Action (CTA) not provided.",
-    "Music style or sound design preferences not specified.",
-    "Detailed guidance on the desired 'customer reaction' is missing.",
-    "Brief specified 15-second duration, which differs from the required 30-second schema duration."
+    "Specific call to action (CTA)",
+    "Music/audio direction",
+    "Overall brand color palette and typography not specified for this campaign (though general brand guidelines exist)",
+    "Confirmation on video duration (brief states 15s, while common short-form is 30s)"
   ],
-  "confidence_score": 0.88
+  "confidence_score": 0.85
 }
 ```
 
@@ -116,27 +115,26 @@ Launch Oatly's new Barista Edition oat milk in Singapore. Target: 22–35 urban 
   "key_message": "It's just oat milk. But better. Way better.",
   "mandatory_elements": [
     "Oatly logo",
-    "the phrase 'Post Milk Generation'",
-    "Oatly Barista Edition carton in a real café setting",
-    "barista pouring latte art",
-    "customer reaction"
+    "carton of Oatly Barista Edition",
+    "phrase 'Post Milk Generation'"
   ],
   "tone_descriptors": [
     "weird-confident",
     "self-aware",
-    "absurd"
+    "absurd",
+    "not corny"
   ],
   "format": {
-    "duration_seconds": 30,
+    "duration_seconds": 15,
     "aspect_ratio": "9:16",
-    "platform": "TikTok"
+    "platform": "TikTok, Instagram Reels"
   },
   "brief_gaps": [
-    "Specific Call to Action (CTA) not provided.",
-    "Music style or sound design preferences not specified.",
-    "Detailed guidance on the desired 'customer reaction' is missing.",
-    "Brief specified 15-second duration, which differs from the required 30-second schema duration."
+    "Specific call to action (CTA)",
+    "Music/audio direction",
+    "Overall brand color palette and typography not specified for this campaign (though general brand guidelines exist)",
+    "Confirmation on video duration (brief states 15s, while common short-form is 30s)"
   ],
-  "confidence_score": 0.88
+  "confidence_score": 0.85
 }
 ```

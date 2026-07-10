@@ -2,13 +2,13 @@
   "_metadata": {
     "stage": "brief-parsing",
     "runId": "run-1783674082289-f99886",
-    "writtenAt": "2026-07-10T09:16:02.496Z",
+    "writtenAt": "2026-07-10T09:19:14.983Z",
     "pipelineComponent": "brief-parsing-v1",
     "model": "vertexai/gemini-2.5-flash",
-    "confidenceScore": 0.88,
+    "confidenceScore": 0.85,
     "inputTokens": 847,
-    "outputTokens": 311,
-    "costUsd": 0.000039206249999999994
+    "outputTokens": 302,
+    "costUsd": 0.00003853125
   },
   "brand": "Oatly",
   "campaign_objective": "Launch Oatly's new Barista Edition oat milk in Singapore.",
@@ -19,26 +19,25 @@
   "key_message": "It's just oat milk. But better. Way better.",
   "mandatory_elements": [
     "Oatly logo",
-    "the phrase 'Post Milk Generation'",
-    "Oatly Barista Edition carton in a real café setting",
-    "barista pouring latte art",
-    "customer reaction"
+    "carton of Oatly Barista Edition",
+    "phrase 'Post Milk Generation'"
   ],
   "tone_descriptors": [
     "weird-confident",
     "self-aware",
-    "absurd"
+    "absurd",
+    "not corny"
   ],
   "format": {
-    "duration_seconds": 30,
+    "duration_seconds": 15,
     "aspect_ratio": "9:16",
-    "platform": "TikTok"
+    "platform": "TikTok, Instagram Reels"
   },
   "brief_gaps": [
-    "Specific Call to Action (CTA) not provided.",
-    "Music style or sound design preferences not specified.",
-    "Detailed guidance on the desired 'customer reaction' is missing.",
-    "Brief specified 15-second duration, which differs from the required 30-second schema duration."
+    "Specific call to action (CTA)",
+    "Music/audio direction",
+    "Overall brand color palette and typography not specified for this campaign (though general brand guidelines exist)",
+    "Confirmation on video duration (brief states 15s, while common short-form is 30s)"
   ],
-  "confidence_score": 0.88
+  "confidence_score": 0.85
 }
