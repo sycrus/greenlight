@@ -1,0 +1,44 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783676831941-2e7753",
+    "writtenAt": "2026-07-10T09:47:14.278Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "deepseek-chat",
+    "confidenceScore": 0.85,
+    "inputTokens": 782,
+    "outputTokens": 231,
+    "costUsd": 0.00046524000000000007
+  },
+  "brand": "Nike",
+  "campaign_objective": "Launch the Nike Air Max Dn to Gen Z with a raw, real TikTok-first campaign",
+  "target_audience": {
+    "primary": "Gen Z, ages 18–24, sneaker culture, streetwear adjacent",
+    "secondary": null
+  },
+  "key_message": "Feel the Unreal",
+  "mandatory_elements": [
+    "brand logo",
+    "brand tagline",
+    "visible Air unit in every shot",
+    "volt green and total orange colorways"
+  ],
+  "tone_descriptors": [
+    "raw",
+    "real",
+    "unpolished",
+    "energetic"
+  ],
+  "format": {
+    "duration_seconds": 30,
+    "aspect_ratio": "9:16",
+    "platform": "TikTok"
+  },
+  "brief_gaps": [
+    "Specific call to action not provided",
+    "Music or sound design style not specified",
+    "No mention of influencer or creator usage",
+    "Brand's restricted imagery rules not detailed"
+  ],
+  "confidence_score": 0.85
+}
