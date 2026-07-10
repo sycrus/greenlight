@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Model | vertexai/gemini-2.5-flash |
-| Duration | 13.3s |
+| Duration | 11.6s |
 | Input tokens | 847 |
-| Output tokens | 328 |
+| Output tokens | 311 |
 | Cost | $0.00004 |
 
 ## Verification
@@ -13,7 +13,7 @@
 | Check |
 |---|
 | ✅ schema valid |
-| ✅ confidence ≥ 0.5 — confidence: 0.85 |
+| ✅ confidence ≥ 0.5 — confidence: 0.88 |
 | ✅ brief_gaps populated |
 
 ## System prompt
@@ -78,30 +78,28 @@ Launch Oatly's new Barista Edition oat milk in Singapore. Target: 22–35 urban 
   "key_message": "It's just oat milk. But better. Way better.",
   "mandatory_elements": [
     "Oatly logo",
-    "phrase: Post Milk Generation",
-    "Oatly Barista Edition carton (in a real café setting)",
-    "Barista pouring latte art",
-    "Customer reaction"
+    "the phrase 'Post Milk Generation'",
+    "Oatly Barista Edition carton in a real café setting",
+    "barista pouring latte art",
+    "customer reaction"
   ],
   "tone_descriptors": [
-    "weird",
-    "confident",
+    "weird-confident",
     "self-aware",
-    "absurd",
-    "not corny"
+    "absurd"
   ],
   "format": {
-    "duration_seconds": 15,
+    "duration_seconds": 30,
     "aspect_ratio": "9:16",
-    "platform": "TikTok, Instagram Reels"
+    "platform": "TikTok"
   },
   "brief_gaps": [
-    "Call to action (CTA) not specified",
-    "Desired music/audio style or direction not provided",
-    "Specific talent requirements (e.g., ethnicity, specific age range for customer) beyond 'urban professionals' not specified",
-    "Brand color palette or typography usage specific to this campaign not explicitly stated"
+    "Specific Call to Action (CTA) not provided.",
+    "Music style or sound design preferences not specified.",
+    "Detailed guidance on the desired 'customer reaction' is missing.",
+    "Brief specified 15-second duration, which differs from the required 30-second schema duration."
   ],
-  "confidence_score": 0.85
+  "confidence_score": 0.88
 }
 ```
 
@@ -118,29 +116,27 @@ Launch Oatly's new Barista Edition oat milk in Singapore. Target: 22–35 urban 
   "key_message": "It's just oat milk. But better. Way better.",
   "mandatory_elements": [
     "Oatly logo",
-    "phrase: Post Milk Generation",
-    "Oatly Barista Edition carton (in a real café setting)",
-    "Barista pouring latte art",
-    "Customer reaction"
+    "the phrase 'Post Milk Generation'",
+    "Oatly Barista Edition carton in a real café setting",
+    "barista pouring latte art",
+    "customer reaction"
   ],
   "tone_descriptors": [
-    "weird",
-    "confident",
+    "weird-confident",
     "self-aware",
-    "absurd",
-    "not corny"
+    "absurd"
   ],
   "format": {
-    "duration_seconds": 15,
+    "duration_seconds": 30,
     "aspect_ratio": "9:16",
-    "platform": "TikTok, Instagram Reels"
+    "platform": "TikTok"
   },
   "brief_gaps": [
-    "Call to action (CTA) not specified",
-    "Desired music/audio style or direction not provided",
-    "Specific talent requirements (e.g., ethnicity, specific age range for customer) beyond 'urban professionals' not specified",
-    "Brand color palette or typography usage specific to this campaign not explicitly stated"
+    "Specific Call to Action (CTA) not provided.",
+    "Music style or sound design preferences not specified.",
+    "Detailed guidance on the desired 'customer reaction' is missing.",
+    "Brief specified 15-second duration, which differs from the required 30-second schema duration."
   ],
-  "confidence_score": 0.85
+  "confidence_score": 0.88
 }
 ```

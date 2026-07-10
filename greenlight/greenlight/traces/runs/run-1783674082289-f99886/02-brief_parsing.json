@@ -2,13 +2,13 @@
   "_metadata": {
     "stage": "brief-parsing",
     "runId": "run-1783674082289-f99886",
-    "writtenAt": "2026-07-10T09:01:35.623Z",
+    "writtenAt": "2026-07-10T09:16:02.496Z",
     "pipelineComponent": "brief-parsing-v1",
     "model": "vertexai/gemini-2.5-flash",
-    "confidenceScore": 0.85,
+    "confidenceScore": 0.88,
     "inputTokens": 847,
-    "outputTokens": 328,
-    "costUsd": 0.00004048125
+    "outputTokens": 311,
+    "costUsd": 0.000039206249999999994
   },
   "brand": "Oatly",
   "campaign_objective": "Launch Oatly's new Barista Edition oat milk in Singapore.",
@@ -19,28 +19,26 @@
   "key_message": "It's just oat milk. But better. Way better.",
   "mandatory_elements": [
     "Oatly logo",
-    "phrase: Post Milk Generation",
-    "Oatly Barista Edition carton (in a real café setting)",
-    "Barista pouring latte art",
-    "Customer reaction"
+    "the phrase 'Post Milk Generation'",
+    "Oatly Barista Edition carton in a real café setting",
+    "barista pouring latte art",
+    "customer reaction"
   ],
   "tone_descriptors": [
-    "weird",
-    "confident",
+    "weird-confident",
     "self-aware",
-    "absurd",
-    "not corny"
+    "absurd"
   ],
   "format": {
-    "duration_seconds": 15,
+    "duration_seconds": 30,
     "aspect_ratio": "9:16",
-    "platform": "TikTok, Instagram Reels"
+    "platform": "TikTok"
   },
   "brief_gaps": [
-    "Call to action (CTA) not specified",
-    "Desired music/audio style or direction not provided",
-    "Specific talent requirements (e.g., ethnicity, specific age range for customer) beyond 'urban professionals' not specified",
-    "Brand color palette or typography usage specific to this campaign not explicitly stated"
+    "Specific Call to Action (CTA) not provided.",
+    "Music style or sound design preferences not specified.",
+    "Detailed guidance on the desired 'customer reaction' is missing.",
+    "Brief specified 15-second duration, which differs from the required 30-second schema duration."
   ],
-  "confidence_score": 0.85
+  "confidence_score": 0.88
 }
