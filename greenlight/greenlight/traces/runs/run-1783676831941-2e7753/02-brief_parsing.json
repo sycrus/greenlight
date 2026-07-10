@@ -2,18 +2,18 @@
   "_metadata": {
     "stage": "brief-parsing",
     "runId": "run-1783676831941-2e7753",
-    "writtenAt": "2026-07-10T09:47:27.259Z",
+    "writtenAt": "2026-07-10T09:48:51.133Z",
     "pipelineComponent": "brief-parsing-v1",
     "model": "deepseek-chat",
     "confidenceScore": 0.85,
     "inputTokens": 782,
-    "outputTokens": 262,
-    "costUsd": 0.00049934
+    "outputTokens": 228,
+    "costUsd": 0.00046194000000000004
   },
   "brand": "Nike",
   "campaign_objective": "Launch the Nike Air Max Dn to Gen Z with a TikTok-first campaign emphasizing the Dynamic Air technology",
   "target_audience": {
-    "primary": "Gen Z, aged 18–24, sneaker culture, streetwear adjacent",
+    "primary": "Gen Z aged 18–24, sneaker culture, streetwear adjacent",
     "secondary": null
   },
   "key_message": "Feel the Unreal",
@@ -21,15 +21,13 @@
     "brand logo",
     "brand tagline",
     "visible Air unit in every shot",
-    "volt green and total orange colorways",
-    "Nike swoosh visible in first and last 3 seconds"
+    "volt green and total orange colorways"
   ],
   "tone_descriptors": [
     "raw",
     "real",
     "unpolished",
-    "energetic",
-    "authentic"
+    "energetic"
   ],
   "format": {
     "duration_seconds": 30,
@@ -37,11 +35,9 @@
     "platform": "TikTok"
   },
   "brief_gaps": [
-    "Audio/music direction not specified",
-    "Call to action not specified",
-    "Specific visual style or editing approach not provided",
-    "Hashtag or challenge strategy not mentioned",
-    "Influencer or creator collaboration details not included"
+    "Exact call-to-action or end screen not specified",
+    "Music or sound design direction not provided",
+    "Specific visual style or editing references not given"
   ],
   "confidence_score": 0.85
 }
