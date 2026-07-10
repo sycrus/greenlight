@@ -1,0 +1,44 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783673819929-788864",
+    "writtenAt": "2026-07-10T08:57:08.720Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "vertexai/gemini-2.5-flash",
+    "confidenceScore": 0.85,
+    "inputTokens": 815,
+    "outputTokens": 283,
+    "costUsd": 0.000036506249999999996
+  },
+  "brand": "Nike",
+  "campaign_objective": "Launch the Nike Air Max Dn to Gen Z.",
+  "target_audience": {
+    "primary": "18–24, sneaker culture, streetwear adjacent",
+    "secondary": null
+  },
+  "key_message": "Feel the Unreal.",
+  "mandatory_elements": [
+    "visible Air unit in every shot",
+    "Nike swoosh",
+    "Nike tagline",
+    "Air Max Dn shoe (volt green and total orange colorways)"
+  ],
+  "tone_descriptors": [
+    "raw",
+    "real",
+    "unpolished",
+    "energetic"
+  ],
+  "format": {
+    "duration_seconds": 30,
+    "aspect_ratio": "9:16",
+    "platform": "TikTok"
+  },
+  "brief_gaps": [
+    "Specific creative direction for 'raw and real' content (e.g., user-generated content prompts, influencer focus)",
+    "Specific call to action (CTA)",
+    "Specific Nike tagline to be used",
+    "Desired audio style or trending sounds for TikTok"
+  ],
+  "confidence_score": 0.85
+}
