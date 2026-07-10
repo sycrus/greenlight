@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { callGemini, parseGeminiJson } from "@greenlight/lib/genkit"
+import { callGemini, parseGeminiJson } from "@greenlight/lib/llm"
 import { validateTerritories } from "@greenlight/lib/gemini"
 import { readStageRecord, writeStageRecord } from "@greenlight/lib/firestore"
 import { TERRITORY_GENERATION_SYSTEM_PROMPT } from "@greenlight/lib/prompts/territory-generation"
@@ -110,6 +110,98 @@ export async function POST(req: Request) {
     })
   } catch (err) {
     console.error("[territories] Error:", err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Internal error" },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * PATCH /api/territories — update fields on a single territory without regenerating.
+ * Input: { runId, territoryId: string, fields: { name?, creative_proposition?, tone?, ... } }
+ */
+export async function PATCH(req: Request) {
+  try {
+    const body = (await req.json().catch(() => ({}))) as {
+      runId?: string; territoryId?: string; fields?: Record<string, unknown>
+    }
+    const { runId, territoryId, fields } = body
+    if (!runId || !territoryId || !fields) {
+      return NextResponse.json({ error: "runId, territoryId, and fields are required" }, { status: 400 })
+    }
+
+    const doc = await readStageRecord(runId, "territory-generation")
+    if (!doc?.["territories"]) {
+      return NextResponse.json({ error: "No territories found for this run" }, { status: 404 })
+    }
+
+    const territories = doc["territories"] as Array<Record<string, unknown>>
+    const idx = territories.findIndex((t) => t["id"] === territoryId)
+    if (idx === -1) {
+      return NextResponse.json({ error: `Territory ${territoryId} not found` }, { status: 404 })
+    }
+
+    // Merge fields into the territory
+    territories[idx] = { ...territories[idx], ...fields }
+
+    await writeStageRecord({
+      stage: "territory-generation",
+      runId,
+      data: { territories, divergenceWarnings: doc["divergenceWarnings"] ?? [] },
+    })
+
+    return NextResponse.json({ territory: territories[idx] })
+  } catch (err) {
+    console.error("[territories PATCH] Error:", err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Internal error" },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE /api/territories — remove a single territory.
+ * Input: { runId, territoryId: string }
+ */
+export async function DELETE(req: Request) {
+  try {
+    const body = (await req.json().catch(() => ({}))) as { runId?: string; territoryId?: string }
+    const { runId, territoryId } = body
+    if (!runId || !territoryId) {
+      return NextResponse.json({ error: "runId and territoryId are required" }, { status: 400 })
+    }
+
+    const doc = await readStageRecord(runId, "territory-generation")
+    if (!doc?.["territories"]) {
+      return NextResponse.json({ error: "No territories found" }, { status: 404 })
+    }
+
+    const territories = doc["territories"] as Array<Record<string, unknown>>
+    const filtered = territories.filter((t) => t["id"] !== territoryId)
+    if (filtered.length === territories.length) {
+      return NextResponse.json({ error: `Territory ${territoryId} not found` }, { status: 404 })
+    }
+
+    await writeStageRecord({
+      stage: "territory-generation",
+      runId,
+      data: { territories: filtered, divergenceWarnings: doc["divergenceWarnings"] ?? [] },
+    })
+
+    // Cascade: also delete Visual DNA for this territory
+    const vdDoc = await readStageRecord(runId, "visual-dna")
+    const vdTerritories = (vdDoc?.["territories"] as Record<string, unknown>) ?? {}
+    const hadVd = !!vdTerritories[territoryId]
+    if (hadVd) {
+      delete vdTerritories[territoryId]
+      await writeStageRecord({ stage: "visual-dna", runId, data: { territories: vdTerritories } })
+    }
+
+    return NextResponse.json({ deleted: territoryId, remaining: filtered.length, cascade: { visualDna: hadVd } })
+  } catch (err) {
+    console.error("[territories DELETE] Error:", err)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Internal error" },
       { status: 500 }

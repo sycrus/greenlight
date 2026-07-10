@@ -5,6 +5,10 @@
  *   /runs/{run_id}/stages/{stage_name}    — stage outputs
  *   /runs/{run_id}/gates/{gate_name}      — approval gate records
  *   /runs/{run_id}/summary                — run summary
+ *
+ * Generation tracking (branching):
+ *   Each stage document carries a _generations array with version history.
+ *   Re-running a stage appends a new generation entry and marks downstream stale.
  */
 
 import { initializeApp, getApps, cert, type App } from "firebase-admin/app"
@@ -65,20 +69,9 @@ export interface GateRecord {
 
 // ── Write ────────────────────────────────────────────────────────────────────
 
-/** Write a stage output record. Idempotent — overwrites on retry. */
+/** Write a stage output record. Now delegates to generation-aware write. */
 export async function writeStageRecord(record: StageRecord): Promise<void> {
-  const docRef = db().doc(`runs/${record.runId}/stages/${record.stage}`)
-  await docRef.set({
-    ...(record.data as Record<string, unknown>),
-    _meta: {
-      stage: record.stage,
-      runId: record.runId,
-      tokenCost: record.tokenCost ?? null,
-      imagenCost: record.imagenCost ?? null,
-      imagenGenerations: record.imagenGenerations ?? null,
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-  })
+  await writeStageRecordWithGeneration(record)
 }
 
 /** Write a gate approval record. */
@@ -135,4 +128,99 @@ export async function readRunSummary(
 ): Promise<Record<string, unknown> | null> {
   const doc = await db().doc(`runs/${runId}/summaries/main`).get()
   return doc.exists ? (doc.data() as Record<string, unknown>) : null
+}
+
+// ── Generation tracking (branching) ──────────────────────────────────────────
+
+/** Pipeline DAG — which stages are downstream of a given stage. */
+const PIPELINE_DOWNSTREAM: Record<string, string[]> = {
+  "brief-parsing": ["territory-generation", "visual-dna", "output-generation"],
+  "territory-generation": ["visual-dna", "output-generation"],
+  "visual-dna": ["output-generation"],
+  "output-generation": [],
+}
+
+/**
+ * Write a stage record WITH generation history appended.
+ * Backward-compatible — existing reads still work because top-level data is mirrored.
+ */
+export async function writeStageRecordWithGeneration(record: StageRecord): Promise<string> {
+  const genId = `gen_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  const genEntry = {
+    id: genId,
+    createdAt: new Date().toISOString(),
+    triggeredBy: "user",
+    cost: {
+      tokenCost: record.tokenCost ?? null,
+      imagenCost: record.imagenCost ?? null,
+      imagenGenerations: record.imagenGenerations ?? null,
+    },
+  }
+
+  const docRef = db().doc(`runs/${record.runId}/stages/${record.stage}`)
+  const existing = await docRef.get()
+  const existingData = existing.exists ? (existing.data() as Record<string, unknown>) : {}
+  const existingGens = (existingData["_generations"] as Array<unknown>) ?? []
+
+  // Cap generations at 10 to avoid 1MB doc limit
+  const generations = [...existingGens.slice(-9), genEntry]
+
+  await docRef.set({
+    // Mirror current data at top level for backward compat
+    ...(record.data as Record<string, unknown>),
+    _meta: {
+      stage: record.stage,
+      runId: record.runId,
+      tokenCost: record.tokenCost ?? null,
+      imagenCost: record.imagenCost ?? null,
+      imagenGenerations: record.imagenGenerations ?? null,
+      currentGenerationId: genId,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    _generations: generations,
+    _stale: false,
+  })
+
+  // Mark downstream stages as stale
+  await markStaleDownstream(record.runId, record.stage)
+
+  return genId
+}
+
+/**
+ * Mark all downstream stages as stale after an upstream regeneration.
+ */
+async function markStaleDownstream(runId: string, fromStage: string): Promise<void> {
+  const downstream = PIPELINE_DOWNSTREAM[fromStage]
+  if (!downstream?.length) return
+
+  // Fire-and-forget — write each downstream doc individually
+  const promises = downstream.map((stage) =>
+    db().doc(`runs/${runId}/stages/${stage}`).set({ _stale: true }, { merge: true })
+  )
+  await Promise.all(promises)
+}
+
+/**
+ * Clear the stale flag on a stage (when it's regenerated).
+ */
+export async function clearStaleFlag(runId: string, stage: string): Promise<void> {
+  await db().doc(`runs/${runId}/stages/${stage}`).set({ _stale: false }, { merge: true })
+}
+
+/**
+ * List all generations for a stage. Returns empty array if none.
+ */
+export async function listStageGenerations(
+  runId: string,
+  stage: string
+): Promise<Array<{ id: string; createdAt: string; triggeredBy: string }>> {
+  const doc = await db().doc(`runs/${runId}/stages/${stage}`).get()
+  if (!doc.exists) return []
+  const data = doc.data() as Record<string, unknown>
+  return (data["_generations"] as Array<Record<string, unknown>>)?.map((g) => ({
+    id: g["id"] as string,
+    createdAt: g["createdAt"] as string,
+    triggeredBy: (g["triggeredBy"] as string) ?? "user",
+  })) ?? []
 }

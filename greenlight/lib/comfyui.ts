@@ -161,8 +161,8 @@ export async function submitPrompt(
       throw new Error(`Workflow '${options.workflow}' not found in comfyui/workflows/`)
     }
     workflow = loaded
-    // Inject prompt into the workflow if it has CLIPTextEncode nodes
     injectPrompt(workflow, options.prompt, options.negativePrompt)
+    randomizeSeeds(workflow)
   } else {
     workflow = buildDefaultWorkflow(options)
   }
@@ -190,6 +190,23 @@ export async function submitPrompt(
   const data = (await res.json()) as ComfyPromptResult
   console.log(`[comfyui] Accepted — prompt_id: ${data.prompt_id}`)
   return data
+}
+
+/** Randomize seed values in all KSampler nodes for variation on each generation */
+function randomizeSeeds(workflow: Record<string, unknown>) {
+  for (const [, node] of Object.entries(workflow)) {
+    const n = node as Record<string, unknown>
+    const inputs = n["inputs"] as Record<string, unknown> | undefined
+    if (!inputs) continue
+    // KSampler nodes use "seed"
+    if (n["class_type"] === "KSampler") {
+      inputs["seed"] = Math.floor(Math.random() * 9999999999)
+    }
+    // RandomNoise nodes use "noise_seed"
+    if (n["class_type"] === "RandomNoise") {
+      inputs["noise_seed"] = Math.floor(Math.random() * 9999999999)
+    }
+  }
 }
 
 /** Inject positive/negative prompts into CLIPTextEncode nodes in a workflow */

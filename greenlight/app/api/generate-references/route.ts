@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { generateImage } from "@greenlight/lib/genkit"
+import { generateImage } from "@greenlight/lib/llm"
 import { generateImage as generateComfyImage } from "@greenlight/lib/comfyui"
 import { uploadToGcs, gcsToHttps } from "@greenlight/lib/gcs"
 import { readStageRecord, writeStageRecord } from "@greenlight/lib/firestore"
@@ -28,6 +28,7 @@ interface IngredientData {
   flow_ingredient_prompt: string
   reference_image_uri: string | null
   generated_reference_uri: string | null
+  generated_reference_uris?: string[] | null
 }
 
 interface GeneratedImage {
@@ -98,8 +99,7 @@ export async function POST(req: Request) {
       if (explicitlyRequested) {
         return ingredientIds.includes(ing.ingredient_id)
       }
-      // Bulk generation: skip if already has a URI
-      if (ing.generated_reference_uri) return false
+      // Always allow regenerate — new images append to history
       return true
     })
 
@@ -215,7 +215,12 @@ export async function POST(req: Request) {
           durationMs: 0,
         })
 
-        // Update ingredient in memory
+        // Append to image history — only push if it's a genuinely new URI
+        const uris = [...(ing.generated_reference_uris ?? [])]
+        if (!uris.includes(imageUri)) {
+          uris.push(imageUri)
+        }
+        ing.generated_reference_uris = uris
         ing.generated_reference_uri = imageUri
 
         generated.push({

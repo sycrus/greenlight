@@ -82,8 +82,12 @@ describe("Imagen cost accumulation", () => {
       imagenGenerations: 5,
     })
 
-    const secondWrite = mockDocSet.mock.calls[1]?.[0] as Record<string, unknown>
-    const meta = secondWrite["_meta"] as Record<string, unknown>
+    // Find the second main write (has "territories" field)
+    const writes = mockDocSet.mock.calls.map((c) => c[0] as Record<string, unknown>)
+    const mainWrites = writes.filter((w) => w["territories"] !== undefined)
+    expect(mainWrites.length).toBeGreaterThanOrEqual(2)
+    const secondWrite = mainWrites[1]
+    const meta = secondWrite!["_meta"] as Record<string, unknown>
     expect(meta["imagenCost"]).toBe(0.20)
     expect(meta["imagenGenerations"]).toBe(5)
   })

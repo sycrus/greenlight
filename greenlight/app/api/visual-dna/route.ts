@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { callGemini, parseGeminiJson } from "@greenlight/lib/genkit"
+import { callGemini, parseGeminiJson } from "@greenlight/lib/llm"
 import { validateVisualDNA } from "@greenlight/lib/gemini"
 import { readStageRecord, writeStageRecord } from "@greenlight/lib/firestore"
 import { VISUAL_DNA_SYSTEM_PROMPT } from "@greenlight/lib/prompts/visual-dna"
@@ -130,5 +130,51 @@ export async function POST(req: Request) {
       { error: err instanceof Error ? err.message : "Internal error" },
       { status: 500 }
     )
+  }
+}
+
+/**
+ * PATCH /api/visual-dna — update ingredients for a territory (e.g. clear image URIs).
+ */
+export async function PATCH(req: Request) {
+  try {
+    const body = (await req.json().catch(() => ({}))) as { runId?: string; territoryId?: string; ingredients?: Array<Record<string, unknown>> }
+    const { runId, territoryId, ingredients } = body
+    if (!runId || !territoryId || !ingredients) {
+      return NextResponse.json({ error: "runId, territoryId, and ingredients required" }, { status: 400 })
+    }
+    const doc = await readStageRecord(runId, "visual-dna")
+    const territories = (doc?.["territories"] as Record<string, Record<string, unknown>>) ?? {}
+    if (!territories[territoryId]) {
+      return NextResponse.json({ error: `No Visual DNA for ${territoryId}` }, { status: 404 })
+    }
+    territories[territoryId]!["ingredients"] = ingredients
+    await writeStageRecord({ stage: "visual-dna", runId, data: { territories } })
+    return NextResponse.json({ updated: territoryId })
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Internal error" }, { status: 500 })
+  }
+}
+
+/**
+ * DELETE /api/visual-dna — remove Visual DNA for a single territory.
+ */
+export async function DELETE(req: Request) {
+  try {
+    const body = (await req.json().catch(() => ({}))) as { runId?: string; territoryId?: string }
+    const { runId, territoryId } = body
+    if (!runId || !territoryId) {
+      return NextResponse.json({ error: "runId and territoryId required" }, { status: 400 })
+    }
+    const doc = await readStageRecord(runId, "visual-dna")
+    const territories = (doc?.["territories"] as Record<string, unknown>) ?? {}
+    if (!territories[territoryId]) {
+      return NextResponse.json({ error: `No Visual DNA for ${territoryId}` }, { status: 404 })
+    }
+    delete territories[territoryId]
+    await writeStageRecord({ stage: "visual-dna", runId, data: { territories } })
+    return NextResponse.json({ deleted: territoryId })
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Internal error" }, { status: 500 })
   }
 }

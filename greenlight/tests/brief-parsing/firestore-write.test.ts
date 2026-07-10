@@ -204,9 +204,12 @@ describe("writeStageRecord", () => {
       data: { brand: "Second", updated: true },
     })
 
-    // Both calls should use doc().set() — the second overwrites
-    expect(mockDocSet).toHaveBeenCalledTimes(2)
-    const secondWrite = mockDocSet.mock.calls[1]?.[0] as Record<string, unknown>
+    // Each call writes to main doc + downstream stale markers
+    // Find the second main write (has "brand" field, unlike downstream {_stale:true})
+    const writes = mockDocSet.mock.calls.map((c) => c[0] as Record<string, unknown>)
+    const mainWrites = writes.filter((w) => w["brand"] !== undefined)
+    expect(mainWrites.length).toBe(2)
+    const secondWrite = mainWrites[1]!
     expect(secondWrite["brand"]).toBe("Second")
     expect(secondWrite["updated"]).toBe(true)
   })
