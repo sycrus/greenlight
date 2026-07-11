@@ -39,6 +39,10 @@ export interface ImageGenerationOptions {
   steps?: number
   cfg?: number
   seed?: number
+  /** Aspect ratio for ResolutionSelector nodes (e.g. "1:1 (Square)", "9:16 (Portrait Widescreen)") */
+  aspectRatio?: string
+  /** Megapixels for ResolutionSelector nodes (typically 1) */
+  megapixels?: number
 }
 
 export interface ImageGenerationResult {
@@ -71,7 +75,7 @@ function loadWorkflow(name: string): Record<string, unknown> | null {
   }
 }
 
-function listWorkflows(): string[] {
+export function listWorkflows(): string[] {
   try {
     const { readdirSync } = require("fs")
     return readdirSync(WORKFLOWS_DIR).filter((f: string) => f.endsWith(".json"))
@@ -161,7 +165,7 @@ export async function submitPrompt(
       throw new Error(`Workflow '${options.workflow}' not found in comfyui/workflows/`)
     }
     workflow = loaded
-    injectPrompt(workflow, options.prompt, options.negativePrompt)
+    injectWorkflowParams(workflow, options)
     randomizeSeeds(workflow)
   } else {
     workflow = buildDefaultWorkflow(options)
@@ -209,26 +213,70 @@ function randomizeSeeds(workflow: Record<string, unknown>) {
   }
 }
 
-/** Inject positive/negative prompts into CLIPTextEncode nodes in a workflow */
-function injectPrompt(
+/** Inject prompts and resolution into a workflow.
+ *
+ * Handles multiple workflow structures:
+ * - PrimitiveStringMultiline with "User Prompt" in title → prompt text (Krea2-style)
+ * - CLIPTextEncode with "Positive" in title → prompt text (Ideogram-style + SDXL default)
+ * - CLIPTextEncode with "Negative" in title → negative prompt
+ * - ResolutionSelector → aspect_ratio + megapixels */
+function injectWorkflowParams(
   workflow: Record<string, unknown>,
-  positive: string,
-  negative?: string
+  options: ImageGenerationOptions
 ): void {
+  let promptInjected = false
+  let negativeInjected = false
+  let resolutionInjected = false
+
   for (const [nodeId, node] of Object.entries(workflow)) {
     const n = node as Record<string, unknown>
-    if (n["class_type"] === "CLIPTextEncode") {
-      const meta = n["_meta"] as Record<string, string> | undefined
-      const title = meta?.["title"] ?? ""
-      const inputs = n["inputs"] as Record<string, unknown>
-      if (title.includes("Positive")) {
-        inputs["text"] = positive
-        console.log(`[comfyui] Injected positive prompt into node ${nodeId}`)
-      } else if (title.includes("Negative")) {
-        inputs["text"] = negative ?? "ugly, blurry, low quality, distorted"
-        console.log(`[comfyui] Injected negative prompt into node ${nodeId}`)
+    const meta = n["_meta"] as Record<string, string> | undefined
+    const title = meta?.["title"] ?? ""
+    const inputs = n["inputs"] as Record<string, unknown>
+
+    if (!inputs) continue
+
+    const classType = n["class_type"] as string
+
+    // Krea2-style: user prompt goes into a PrimitiveStringMultiline text node
+    if (!promptInjected && classType === "PrimitiveStringMultiline") {
+      if (title.toLowerCase().includes("user prompt")) {
+        inputs["value"] = options.prompt
+        console.log(`[comfyui] Injected user prompt into node ${nodeId} (${title})`)
+        promptInjected = true
+        continue
       }
     }
+
+    // Ideogram / SDXL-style: prompt goes into CLIPTextEncode
+    if (classType === "CLIPTextEncode") {
+      if (!promptInjected && title.toLowerCase().includes("positive")) {
+        inputs["text"] = options.prompt
+        console.log(`[comfyui] Injected positive prompt into node ${nodeId} (${title})`)
+        promptInjected = true
+      } else if (!negativeInjected && title.toLowerCase().includes("negative")) {
+        inputs["text"] = options.negativePrompt ?? "ugly, blurry, low quality, distorted"
+        console.log(`[comfyui] Injected negative prompt into node ${nodeId} (${title})`)
+        negativeInjected = true
+      }
+    }
+
+    // ResolutionSelector → aspect_ratio + megapixels
+    if (!resolutionInjected && classType === "ResolutionSelector") {
+      if (options.aspectRatio) {
+        inputs["aspect_ratio"] = options.aspectRatio
+        console.log(`[comfyui] Injected aspect_ratio="${options.aspectRatio}" into node ${nodeId}`)
+      }
+      if (options.megapixels !== undefined) {
+        inputs["megapixels"] = options.megapixels
+        console.log(`[comfyui] Injected megapixels=${options.megapixels} into node ${nodeId}`)
+      }
+      resolutionInjected = true
+    }
+  }
+
+  if (!promptInjected) {
+    console.warn("[comfyui] No prompt injection target found in workflow")
   }
 }
 

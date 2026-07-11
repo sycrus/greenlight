@@ -16,6 +16,7 @@ import {
   type Node,
   type Edge,
   type NodeTypes,
+  type OnSelectionChangeParams,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 
@@ -50,6 +51,18 @@ export default function Canvas({ runId }: CanvasProps) {
   useEffect(() => {
     if (rawEdges.length > 0) setEdges(rawEdges as Edge[])
   }, [rawEdges, setEdges])
+
+  // Track selection via React Flow's native callback
+  const onSelectionChange = useCallback(({ nodes: selNodes }: OnSelectionChangeParams) => {
+    if (selNodes.length === 1 && selNodes[0]) {
+      const d = selNodes[0].data as unknown as CanvasNodeData
+      if (d.status !== "pending") {
+        setSelectedNodeId(selNodes[0].id)
+        return
+      }
+    }
+    setSelectedNodeId(null)
+  }, [])
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     const d = node.data as unknown as CanvasNodeData
@@ -106,8 +119,11 @@ export default function Canvas({ runId }: CanvasProps) {
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onSelectionChange={onSelectionChange}
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
+          selectionOnDrag
+          multiSelectionKeyCode="Shift"
           fitView
           fitViewOptions={{ padding: 0.3 }}
           minZoom={0.3}

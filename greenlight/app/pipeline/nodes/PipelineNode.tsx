@@ -1,8 +1,10 @@
 "use client"
 
-import { memo } from "react"
-import { Handle, Position, type NodeProps } from "@xyflow/react"
+import { memo, useCallback, useEffect, useRef, useState } from "react"
+import { Handle, Position, useStoreApi, type NodeProps } from "@xyflow/react"
 import type { CanvasNodeData } from "../types"
+
+// ── NodeSummary ──────────────────────────────────────────────────────────────
 
 function NodeSummary({ type, stageData, gateData }: {
   type: string
@@ -15,7 +17,7 @@ function NodeSummary({ type, stageData, gateData }: {
   switch (type) {
     case "brief_input": {
       const raw = stageData?.["_rawBrief"]
-      return <p className="text-zinc-500 truncate">{typeof raw === "string" ? raw.slice(0, 60) + "…" : "—"}</p>
+      return <p className="text-zinc-500">{typeof raw === "string" ? raw : "—"}</p>
     }
     case "brief_parsing":
     case "brief_parsed": {
@@ -25,12 +27,12 @@ function NodeSummary({ type, stageData, gateData }: {
     }
     case "territory_generation": {
       const territories = stageData?.["territories"] as Array<{ name: string }> | undefined
-      return <div className="space-y-0.5">{territories?.map((t, i) => <p key={i} className="truncate">{t.name}</p>) ?? <span className="text-zinc-600">—</span>}</div>
+      return <div className="space-y-0.5">{territories?.map((t, i) => <p key={i}>{t.name}</p>) ?? <span className="text-zinc-600">—</span>}</div>
     }
     case "territory": {
       const name = stageData?.["name"]
       const prop = stageData?.["creative_proposition"]
-      return <div className="space-y-0.5"><p className="font-medium">{typeof name === "string" ? name : "—"}</p>{prop ? <p className="text-zinc-500 truncate">{String(prop).slice(0, 50)}</p> : null}</div>
+      return <div className="space-y-0.5"><p className="font-medium">{typeof name === "string" ? name : "—"}</p>{prop ? <p className="text-zinc-500">{String(prop)}</p> : null}</div>
     }
     case "visual_dna": {
       const palette = stageData?.["palette"] as { primary: string[]; accent: string[] } | undefined
@@ -53,8 +55,8 @@ function NodeSummary({ type, stageData, gateData }: {
           <img src={imgSrc} alt={desc ?? ""} className="w-full rounded border border-zinc-700 object-cover" style={{ maxHeight: 100 }} />
         )
       }
-      if (imgSrc) return <div className="space-y-1"><p className="truncate">{String(desc ?? "").slice(0, 40)}</p><p className="text-green-500 text-[10px]">✓ Image</p></div>
-      if (desc) return <div className="space-y-0.5"><p className="truncate">{String(desc).slice(0, 50)}</p><p className="text-zinc-500">—</p></div>
+      if (imgSrc) return <div className="space-y-1"><p>{String(desc ?? "")}</p><p className="text-green-500 text-[10px]">✓ Image</p></div>
+      if (desc) return <div className="space-y-0.5"><p>{String(desc)}</p><p className="text-zinc-500">—</p></div>
       return <p>Reference</p>
     }
     case "deck_generation":
@@ -83,27 +85,92 @@ function imgNodeUrl(uri: string | null | undefined): string | null {
   return uri
 }
 
+// ── Constants ────────────────────────────────────────────────────────────────
+
 const BORDER_COLORS: Record<string, string> = { complete: "border-green-800", ready: "border-blue-800", running: "border-amber-800", pending: "border-zinc-700", stale: "border-amber-700", error: "border-red-800" }
 const STATUS_BADGES: Record<string, { label: string; className: string }> = { complete: { label: "Done", className: "bg-green-950/50 text-green-400 border-green-800" }, ready: { label: "Ready", className: "bg-blue-950/50 text-blue-400 border-blue-800" }, running: { label: "Running", className: "bg-amber-950/50 text-amber-400 border-amber-800" }, pending: { label: "Pending", className: "bg-zinc-800 text-zinc-500 border-zinc-700" }, stale: { label: "Stale", className: "bg-amber-950/50 text-amber-400 border-amber-800" }, error: { label: "Error", className: "bg-red-950/50 text-red-400 border-red-800" } }
+
+const MIN_W = 220
+const MAX_W = 700
+const MIN_H = 80
+const MAX_H = 600
+const EDGE = 6 // px — thickness of resize hit zones at edges
+
+type ResizeDir = "e" | "s" | "se" | null
+
+// ── PipelineNode ─────────────────────────────────────────────────────────────
 
 function PipelineNode({ data, selected }: NodeProps) {
   const d = data as unknown as CanvasNodeData
   const status = (d.status as string) ?? "pending"
   const border = BORDER_COLORS[status] ?? "border-zinc-700"
   const badge = STATUS_BADGES[status] ?? STATUS_BADGES["pending"]!
-  return <div className={`rounded-lg border bg-zinc-900/50 p-1.5 min-w-[160px] max-w-[400px] shadow-lg resize overflow-auto ${border} ${status === "ready" ? "animate-pulse" : ""} ${selected ? "ring-1 ring-white/20" : ""}`}>
-    <Handle type="target" position={Position.Left} className="!bg-zinc-600" />
-    <div className="flex items-center gap-1 mb-1">
-      <span className="text-xs">{d.icon as string}</span>
-      <span className="text-[11px] font-medium text-zinc-200 truncate flex-1">{d.label as string}</span>
-      <span className={`rounded-full px-1 py-0 text-[8px] border shrink-0 ${badge.className}`}>{badge.label}</span>
+
+  const store = useStoreApi()
+  const ref = useRef<HTMLDivElement>(null)
+  const [resizing, setResizing] = useState<ResizeDir>(null)
+  const [w, setW] = useState(260)       // current node width
+  const [h, setH] = useState<number | null>(null) // null = auto height
+  const anchor = useRef({ mx: 0, my: 0, w: 0, h: 0 })
+
+  const begin = useCallback((dir: ResizeDir) => (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    const el = ref.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    anchor.current = { mx: e.clientX, my: e.clientY, w: r.width, h: r.height }
+    setResizing(dir)
+  }, [])
+
+  useEffect(() => {
+    if (!resizing) return
+    const onMove = (e: MouseEvent) => {
+      const z = store.getState().transform[2] // zoom
+      const dx = (e.clientX - anchor.current.mx) / z
+      const dy = (e.clientY - anchor.current.my) / z
+      if (resizing === "e" || resizing === "se") setW(clamp(anchor.current.w + dx, MIN_W, MAX_W))
+      if (resizing === "s" || resizing === "se") setH(clamp(anchor.current.h + dy, MIN_H, MAX_H))
+    }
+    const onUp = () => setResizing(null)
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp) }
+  }, [resizing, store])
+
+  const cursor = resizing ? (resizing === "e" ? "ew-resize" : resizing === "s" ? "ns-resize" : "nwse-resize") : undefined
+
+  return (
+    <div
+      ref={ref}
+      className={`rounded-lg border bg-zinc-900/50 p-1.5 shadow-lg relative overflow-hidden ${resizing ? "nodrag" : ""} ${border} ${status === "ready" ? "animate-pulse" : ""} ${selected ? "ring-1 ring-white/20" : ""}`}
+      style={{ width: w, minWidth: MIN_W, maxWidth: MAX_W, minHeight: MIN_H, maxHeight: MAX_H, ...(h !== null && { height: h }), ...(cursor !== undefined && { cursor }) }}
+    >
+      <Handle type="target" position={Position.Left} className="!bg-zinc-600" />
+
+      {/* Resize hit zones — always present on node edges. nodrag prevents React Flow from moving the node. */}
+      {!resizing && (
+        <>
+          <div className="nodrag absolute top-0 right-0 bottom-0 z-20 cursor-ew-resize" style={{ width: EDGE }} onMouseDown={begin("e")} />
+          <div className="nodrag absolute bottom-0 left-0 right-0 z-20 cursor-ns-resize" style={{ height: EDGE }} onMouseDown={begin("s")} />
+          <div className="nodrag absolute bottom-0 right-0 z-20 cursor-nwse-resize" style={{ width: EDGE + 4, height: EDGE + 4 }} onMouseDown={begin("se")} />
+        </>
+      )}
+
+      <div className="flex items-center gap-1 mb-1">
+        <span className="text-xs shrink-0">{d.icon as string}</span>
+        <span className="text-[11px] font-medium text-zinc-200 flex-1">{d.label as string}</span>
+        <span className={`rounded-full px-1 py-0 text-[8px] border shrink-0 ${badge.className}`}>{badge.label}</span>
+      </div>
+      <div className="text-[10px] text-zinc-400 leading-relaxed whitespace-normal break-words">
+        <NodeSummary type={d.type as string} stageData={d.stageData as Record<string, unknown> | null} gateData={d.gateData as Record<string, unknown> | null} />
+      </div>
+      {(d.isStale as boolean) && <div className="mt-2 rounded bg-amber-950/30 px-2 py-1 text-[10px] text-amber-400 border border-amber-800/50">⚠ Stale — upstream changed</div>}
+      <Handle type="source" position={Position.Right} className="!bg-zinc-600" />
     </div>
-    <div className="text-[10px] text-zinc-400 leading-tight min-h-[12px]">
-      <NodeSummary type={d.type as string} stageData={d.stageData as Record<string, unknown> | null} gateData={d.gateData as Record<string, unknown> | null} />
-    </div>
-    {(d.isStale as boolean) && <div className="mt-2 rounded bg-amber-950/30 px-2 py-1 text-[10px] text-amber-400 border border-amber-800/50">⚠ Stale — upstream changed</div>}
-    <Handle type="source" position={Position.Right} className="!bg-zinc-600" />
-  </div>
+  )
 }
+
+function clamp(v: number, lo: number, hi: number) { return v < lo ? lo : v > hi ? hi : v }
 
 export default memo(PipelineNode)

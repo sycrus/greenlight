@@ -1,6 +1,8 @@
 "use client"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import type { CanvasNodeData } from "../types"
+
+const DEFAULT_WORKFLOW = "image_krea2_turbo_t2i_int8"
 
 interface Props { runId: string; nodeData: CanvasNodeData; onRefresh: () => void; onAdvance?: () => void; error: string | null; setError: (e: string | null) => void }
 
@@ -15,7 +17,23 @@ interface VisualDNAData {
 export default function VisualDnaPanelContent({ runId, nodeData, onRefresh, onAdvance, error, setError }: Props) {
   const [encoding, setEncoding] = useState(false)
   const [genRefs, setGenRefs] = useState(false)
+  const [workflows, setWorkflows] = useState<string[]>([])
+  const [selectedWorkflow, setSelectedWorkflow] = useState(DEFAULT_WORKFLOW)
   const genBusy = useRef(false)
+
+  useEffect(() => {
+    fetch("/api/comfyui-workflows")
+      .then(r => r.json())
+      .then(d => {
+        if (d.workflows?.length) {
+          setWorkflows(d.workflows)
+          if (!d.workflows.includes(selectedWorkflow)) {
+            setSelectedWorkflow(d.workflows[0])
+          }
+        }
+      })
+      .catch(() => {})
+  }, [])
   const territories = nodeData.stageData?.["territories"] as Record<string, VisualDNAData> | undefined
   // Single VD node
   const single = !territories ? nodeData.stageData as unknown as VisualDNAData | null : null
@@ -45,7 +63,7 @@ export default function VisualDnaPanelContent({ runId, nodeData, onRefresh, onAd
         // Generate for a single territory — include all non-brand-asset ingredients
         const allIngIds = single?.ingredients?.filter(i => i.type !== "brand_asset").map(i => i.ingredient_id) ?? []
         if (!allIngIds.length) throw new Error("No ingredients to generate images for")
-        const res = await fetch("/api/generate-references", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, territoryId: tid, ingredientIds: allIngIds, source: "comfyui", workflow: "image_ideogram4_t2i" }) })
+        const res = await fetch("/api/generate-references", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, territoryId: tid, ingredientIds: allIngIds, source: "comfyui", workflow: selectedWorkflow }) })
         if (!res.ok) throw new Error((await res.json()).error)
       } else {
         // Generate for all territories
@@ -56,7 +74,7 @@ export default function VisualDnaPanelContent({ runId, nodeData, onRefresh, onAd
           const ings = v["ingredients"] as Array<{ ingredient_id: string; type: string; generated_reference_uri?: string | null }> | undefined
           const ids = ings?.filter(i => i.type !== "brand_asset").map(i => i.ingredient_id) ?? []
           if (ids.length) {
-            const res = await fetch("/api/generate-references", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, territoryId: tId, ingredientIds: ids, source: "comfyui", workflow: "image_ideogram4_t2i" }) })
+            const res = await fetch("/api/generate-references", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, territoryId: tId, ingredientIds: ids, source: "comfyui", workflow: selectedWorkflow }) })
             if (!res.ok) throw new Error((await res.json()).error)
           }
         }
@@ -133,6 +151,15 @@ export default function VisualDnaPanelContent({ runId, nodeData, onRefresh, onAd
         className="w-full rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-200 disabled:opacity-40 transition-colors">
         {genRefs ? "Generating…" : "🎨 Generate Reference Images"}
       </button>
+
+      {workflows.length > 0 && (
+        <select value={selectedWorkflow} onChange={e => setSelectedWorkflow(e.target.value)}
+          className="w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 focus:border-zinc-500 focus:outline-none">
+          {workflows.map(w => (
+            <option key={w} value={w}>{w.replace(/^image_/, "").replace(/_/g, " ")}</option>
+          ))}
+        </select>
+      )}
     </div>
   )
 }

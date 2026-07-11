@@ -1,12 +1,30 @@
 "use client"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import type { CanvasNodeData } from "../types"
+
+const DEFAULT_WORKFLOW = "image_krea2_turbo_t2i_int8"
 
 interface Props { runId: string; nodeData: CanvasNodeData; onRefresh: () => void; onAdvance?: () => void; error: string | null; setError: (e: string | null) => void }
 
 export default function ReferencesPanel({ runId, nodeData, onRefresh, onAdvance, error, setError }: Props) {
   const [generating, setGenerating] = useState<Record<string, boolean>>({})
+  const [workflows, setWorkflows] = useState<string[]>([])
+  const [selectedWorkflow, setSelectedWorkflow] = useState(DEFAULT_WORKFLOW)
   const genBusy = useRef(false)
+
+  useEffect(() => {
+    fetch("/api/comfyui-workflows")
+      .then(r => r.json())
+      .then(d => {
+        if (d.workflows?.length) {
+          setWorkflows(d.workflows)
+          if (!d.workflows.includes(selectedWorkflow)) {
+            setSelectedWorkflow(d.workflows[0])
+          }
+        }
+      })
+      .catch(() => {})
+  }, [])
   const territories = nodeData.stageData?.["territories"] as Record<string, { ingredients: Array<{ ingredient_id: string; type: string; description: string; generated_reference_uri: string | null; reference_image_uri: string | null }> }> | undefined
   // Single ingredient node (from reference node click)
   const singleIng = !territories ? nodeData.stageData as { ingredient_id: string; type: string; description: string; generated_reference_uri: string | null; reference_image_uri: string | null } | null : null
@@ -31,7 +49,7 @@ export default function ReferencesPanel({ runId, nodeData, onRefresh, onAdvance,
       const res = await fetch("/api/generate-references", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runId, territoryId, ingredientIds: [ingredientId], source: "comfyui", workflow: "image_ideogram4_t2i" }),
+        body: JSON.stringify({ runId, territoryId, ingredientIds: [ingredientId], source: "comfyui", workflow: selectedWorkflow }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Generation failed")
@@ -54,6 +72,14 @@ export default function ReferencesPanel({ runId, nodeData, onRefresh, onAdvance,
         <h3 className="text-sm font-semibold text-zinc-300">{singleIng.ingredient_id}</h3>
         <p className="text-xs text-zinc-500">{singleIng.description}</p>
         <p className="text-[10px] text-zinc-600">Type: {singleIng.type}</p>
+        {workflows.length > 0 && (
+          <select value={selectedWorkflow} onChange={e => setSelectedWorkflow(e.target.value)}
+            className="w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 focus:border-zinc-500 focus:outline-none">
+            {workflows.map(w => (
+              <option key={w} value={w}>{w.replace(/^image_/, "").replace(/_/g, " ")}</option>
+            ))}
+          </select>
+        )}
         {url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt={singleIng.description} className="w-full rounded border border-zinc-700" />
@@ -142,6 +168,14 @@ export default function ReferencesPanel({ runId, nodeData, onRefresh, onAdvance,
         )}
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
+      {workflows.length > 0 && (
+        <select value={selectedWorkflow} onChange={e => setSelectedWorkflow(e.target.value)}
+          className="w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 focus:border-zinc-500 focus:outline-none">
+          {workflows.map(w => (
+            <option key={w} value={w}>{w.replace(/^image_/, "").replace(/_/g, " ")}</option>
+          ))}
+        </select>
+      )}
       <p className="text-xs text-zinc-500">{generatedIngs}/{totalIngs} images generated</p>
       {entries.map(([tid, vd]) => (
         <div key={tid} className="space-y-2">
