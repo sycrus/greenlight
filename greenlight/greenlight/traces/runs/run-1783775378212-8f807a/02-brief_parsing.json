@@ -1,0 +1,45 @@
+{
+  "_metadata": {
+    "stage": "brief-parsing",
+    "runId": "run-1783775378212-8f807a",
+    "writtenAt": "2026-07-11T13:09:40.737Z",
+    "pipelineComponent": "brief-parsing-v1",
+    "model": "deepseek-chat",
+    "confidenceScore": 0.88,
+    "inputTokens": 816,
+    "outputTokens": 277,
+    "costUsd": 0.0005250200000000001
+  },
+  "brand": "Oatly",
+  "campaign_objective": "Launch Oatly's new Barista Edition oat milk in Singapore",
+  "target_audience": {
+    "primary": "22–35 urban professionals who go to specialty coffee shops",
+    "secondary": null
+  },
+  "key_message": "It's just oat milk. But better. Way better.",
+  "mandatory_elements": [
+    "Oatly logo",
+    "Post Milk Generation phrase",
+    "Oatly Barista Edition carton in real café setting",
+    "barista pouring latte art",
+    "customer reaction"
+  ],
+  "tone_descriptors": [
+    "weird-confident",
+    "self-aware",
+    "absurd",
+    "not corny"
+  ],
+  "format": {
+    "duration_seconds": 15,
+    "aspect_ratio": "9:16",
+    "platform": "TikTok and Instagram Reels"
+  },
+  "brief_gaps": [
+    "No specific color palette or typography guidelines provided beyond general brand rules",
+    "No call-to-action or desired outcome (e.g., link in bio, store locator) specified",
+    "No audio or music style direction provided",
+    "No specific Singaporean cultural references or localization details given"
+  ],
+  "confidence_score": 0.88
+}
